@@ -11,38 +11,42 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-/* VOICE: sideline clipboard, quick and friendly, nothing corporate
-   IDEA: the chalked tactics board on the pitch, posts are cards pinned to it
+/* VOICE: sideline clipboard, quick and friendly, calm
+   IDEA: the club's own colours on a clean team sheet; the header carries the sport's field markings
    PICTURE: the live pool of shared clips with upvote meters filling toward the coach line
-   COLOUR and TYPE: pitch green field, chalk white cards, signal coral accent; Barlow Condensed + Barlow
-   LAYOUT: app shell, top bar, tabs, single card column, floating share button */
+   COLOUR and TYPE: team colour band (from sport or club), quiet paper, signal coral accent; Barlow Condensed + Barlow
+   LAYOUT: app shell, coloured top band, tabs on paper, single card column, floating share button */
 :root{color-scheme:light dark;
-  --bg:light-dark(#0b4d33,#06281b);--field2:light-dark(#0e5a3c,#0a3423);
-  --card:light-dark(#fbfcf8,#14201a);--ink:light-dark(#13201a,#e8efe9);--soft:light-dark(#5b6b62,#9db0a4);
-  --line:light-dark(#dfe6df,#27382e);--chalk:#f3f7f1;--acc:#ff5a3c;--acc2:light-dark(#ffe7e1,#3a1d16);
-  --ok:light-dark(#0f7a4a,#5fd39a);--okbg:light-dark(#e3f4ea,#12321f)}
+  --bg:#1f6b46;--chalk:#ffffff; /* team colour + text on it, set by applyTheme() */
+  --paper:light-dark(#f4f5f2,#0f1311);
+  --card:light-dark(#ffffff,#182019);--ink:light-dark(#151a17,#e8eee9);--soft:light-dark(#5d6862,#9fb0a6);
+  --line:light-dark(#e2e6e1,#2a352e);--acc:#ff5a3c;--acc2:light-dark(#ffe9e3,#3a1d16);
+  --ok:light-dark(#0f7a4a,#5fd39a);--okbg:light-dark(#e6f4ec,#12321f)}
 :root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
 *{box-sizing:border-box;min-width:0}
 html,body{margin:0}
-body{background:var(--bg);color:var(--ink);font:16px/1.5 Barlow,system-ui,sans-serif;overflow-x:clip;min-height:100vh;
-  background-image:repeating-linear-gradient(90deg,transparent 0 64px,var(--field2) 64px 128px)}
+body{background:var(--paper);color:var(--ink);font:16px/1.5 Barlow,system-ui,sans-serif;overflow-x:clip;min-height:100vh}
 h1,h2,h3{font-family:"Barlow Condensed",Barlow,sans-serif;font-weight:700;line-height:1.05;margin:0;text-wrap:balance}
 button,input,textarea,select{font:inherit;font-size:16px}
 button{cursor:pointer}
 :focus-visible{outline:3px solid var(--acc);outline-offset:2px}
-.top{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;padding:12px max(4vw,14px);
-  background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);color:var(--chalk)}
-.top h1{font-size:28px;letter-spacing:.01em}
-.top .team{margin-left:auto;font-size:14px;opacity:.85;text-align:right}
-.tabs{display:flex;gap:6px;padding:0 max(4vw,14px) 10px;overflow-x:auto;position:sticky;top:56px;z-index:4;
-  background:color-mix(in srgb,var(--bg) 92%,transparent)}
-.tab{flex:none;min-height:40px;padding:6px 14px;border-radius:999px;border:1.5px solid color-mix(in srgb,var(--chalk) 40%,transparent);
-  background:transparent;color:var(--chalk);font-weight:600}
-.tab[aria-selected=true]{background:var(--chalk);color:#0b4d33;border-color:var(--chalk)}
+.top{position:relative;overflow:hidden;display:flex;align-items:center;gap:12px;padding:16px max(4vw,14px) 18px;
+  background:var(--bg);color:var(--chalk)}
+.top .motif{position:absolute;right:-10px;top:-10px;height:calc(100% + 20px);width:auto;opacity:.16;pointer-events:none}
+.top .logo{flex:none;width:52px;height:52px;border-radius:14px;object-fit:contain;background:#fff;padding:4px;box-shadow:0 2px 8px rgba(0,0,0,.2)}
+.top .mark{flex:none;width:44px;height:44px}
+.top .names{position:relative;min-width:0}
+.top h1{font-size:26px;letter-spacing:.01em;overflow-wrap:anywhere}
+.top .sub{font-size:14px;opacity:.85}
+.tabs{display:flex;gap:6px;padding:10px max(4vw,14px);overflow-x:auto;position:sticky;top:0;z-index:4;
+  background:color-mix(in srgb,var(--paper) 94%,transparent);backdrop-filter:blur(8px);border-bottom:1px solid var(--line)}
+.tab{flex:none;min-height:40px;padding:6px 14px;border-radius:999px;border:1.5px solid var(--line);
+  background:var(--card);color:var(--ink);font-weight:600}
+.tab[aria-selected=true]{background:var(--bg);color:var(--chalk);border-color:var(--bg)}
 .tab .n{display:inline-block;min-width:20px;margin-left:6px;padding:0 6px;border-radius:999px;background:var(--acc);color:#fff;font-size:13px}
 main{max-width:720px;margin:0 auto;padding:6px max(4vw,14px) 120px}
-.hint{color:var(--chalk);opacity:.85;font-size:14px;margin:6px 2px 12px}
-.card{background:var(--card);border-radius:16px;padding:14px;margin:0 0 14px;box-shadow:0 2px 0 rgba(0,0,0,.18),0 10px 24px rgba(0,0,0,.18)}
+.hint{color:var(--soft);font-size:14px;margin:14px 2px 12px}
+.card{background:var(--card);border-radius:16px;padding:14px;margin:0 0 14px;border:1px solid var(--line);box-shadow:0 1px 2px rgba(0,0,0,.04),0 6px 18px rgba(0,0,0,.05)}
 .post{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px}
 .thumb{width:96px;height:128px;border-radius:10px;overflow:hidden;display:grid;place-items:center;color:#fff;
   font-family:"Barlow Condensed";font-weight:700;font-size:18px;text-decoration:none;position:relative}
@@ -84,15 +88,16 @@ textarea{min-height:80px;resize:vertical}
 .review{margin-top:10px;padding-top:10px;border-top:1.5px dashed var(--line)}
 .stars button{min-width:44px;min-height:44px;border:0;background:transparent;font-size:26px;color:var(--line);padding:0}
 .stars button.on{color:#f5a623}
-.empty{color:var(--chalk);text-align:center;padding:40px 10px}
+.empty{color:var(--soft);text-align:center;padding:40px 10px}.empty h2{color:var(--ink)}
 .empty h2{font-size:30px;margin-bottom:6px}
 .code{font-family:"Barlow Condensed";font-size:34px;letter-spacing:.12em;font-weight:700}
 .toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:20;background:#13201a;color:#fff;padding:10px 16px;border-radius:12px;
   font-size:15px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw}
 .toast.on{opacity:1}
+.demo[hidden]{display:none}
 .demo{background:var(--acc);color:#fff;font-size:14px;padding:8px max(4vw,14px);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .demo select{width:auto;min-height:36px;padding:4px 8px;font-size:15px}
-.hero{color:var(--chalk);padding:28px 4px 12px}
+.hero{color:#fff;background:var(--bg);margin:0 calc(-1 * max(4vw,14px)) 16px;padding:28px max(4vw,14px) 18px}
 .hero h1{font-size:clamp(40px,10vw,56px)}
 .hero p{font-size:18px;opacity:.9;max-width:34em}
 .board{display:block;width:100%;height:auto;margin:10px 0 6px}
@@ -101,7 +106,7 @@ textarea{min-height:80px;resize:vertical}
 .pick[aria-pressed=true]{background:var(--bg);border-color:var(--bg);color:var(--chalk)}
 .pick.new{border-style:dashed}
 .filters{display:flex;gap:6px;overflow-x:auto;margin:0 0 12px;padding-bottom:2px}
-.filters .pick{flex:none;color:var(--chalk);border-color:color-mix(in srgb,var(--chalk) 35%,transparent)}
+.filters .pick{flex:none;background:var(--card)}
 .filters .pick[aria-pressed=true]{background:var(--acc);border-color:var(--acc);color:#fff}
 .cat{display:inline-block;padding:1px 8px;border-radius:6px;font-size:13px;font-weight:600;background:var(--bg);color:var(--chalk)}
 .catlist{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
@@ -208,6 +213,8 @@ function makeDemo(kind){
       switch (fn) {
         case 'whoami': return {member_id:m.id, name:m.name, role:m.role, team:{...team, categories:[...team.categories], coach_code: coach ? team.coach_code : null}};
         case 'set_team': if (!coach) throw new Error(ERR.coach_only); if (a.p_name) team.name = a.p_name; if (a.p_sport) team.sport = a.p_sport; return null;
+        case 'set_team_style': if (!coach) throw new Error(ERR.coach_only);
+          if (a.p_color != null) team.color = a.p_color || null; if (a.p_logo != null) team.logo = a.p_logo || null; return null;
         case 'add_category': if (!coach) throw new Error(ERR.coach_only); ensureCat(a.p_name); return null;
         case 'delete_category': if (!coach) throw new Error(ERR.coach_only); team.categories = team.categories.filter(c => c.toLowerCase() !== a.p_name.toLowerCase()); return null;
         case 'set_post_category': { const p = find(a.p_post_id); if (p.by !== me && !coach) throw new Error(ERR.not_allowed); p.category = ensureCat(a.p_category); return null; }
@@ -274,6 +281,50 @@ async function preview(u){
 
 // ---------- state ----------
 let api = remote, demo = null, S = {me:null, posts:[], tab:'pool', open:null, cat:''};
+// ---------- theme: colour + field markings per sport, overridable by club colour and logo ----------
+const MOTIF = {
+  field:'<rect x="8" y="8" width="184" height="104" rx="2"/><line x1="100" y1="8" x2="100" y2="112"/><circle cx="100" cy="60" r="20"/><rect x="8" y="34" width="26" height="52"/><rect x="166" y="34" width="26" height="52"/>',
+  court:'<rect x="8" y="8" width="184" height="104" rx="2"/><line x1="100" y1="8" x2="100" y2="112"/><path d="M8 30 A34 34 0 0 1 8 90"/><path d="M192 30 A34 34 0 0 0 192 90"/><circle cx="100" cy="60" r="14"/>',
+  net:'<rect x="8" y="8" width="184" height="104" rx="2"/><line x1="100" y1="2" x2="100" y2="118" stroke-width="5"/><line x1="64" y1="8" x2="64" y2="112"/><line x1="136" y1="8" x2="136" y2="112"/>',
+  lanes:'<line x1="0" y1="20" x2="200" y2="20"/><line x1="0" y1="44" x2="200" y2="44"/><line x1="0" y1="68" x2="200" y2="68"/><line x1="0" y1="92" x2="200" y2="92"/><line x1="0" y1="116" x2="200" y2="116"/>',
+  weights:'<rect x="30" y="30" width="14" height="60" rx="3"/><rect x="46" y="40" width="10" height="40" rx="3"/><line x1="56" y1="60" x2="144" y2="60" stroke-width="6"/><rect x="144" y="40" width="10" height="40" rx="3"/><rect x="156" y="30" width="14" height="60" rx="3"/>',
+  mat:'<circle cx="100" cy="60" r="52"/><circle cx="100" cy="60" r="32"/><circle cx="100" cy="60" r="8"/>'};
+const SPORT_STYLE = {
+  'Fußball':['#1f6b46','field'], 'Handball':['#1d5fa8','field'], 'Hockey':['#1f6f63','field'], 'Rugby':['#4d6b16','field'], 'American Football':['#6b3e1e','field'],
+  'Basketball':['#c2551b','court'], 'Eishockey':['#25609e','court'],
+  'Volleyball':['#b7791f','net'], 'Tennis':['#a84a25','net'], 'Tischtennis':['#1e4fa0','net'], 'Badminton':['#0f766e','net'],
+  'Leichtathletik':['#b4432f','lanes'], 'Schwimmen':['#0a7bb8','lanes'], 'Laufen':['#d0541a','lanes'], 'Radsport':['#3b4652','lanes'],
+  'Kraftsport':['#2b3440','weights'], 'Fitness':['#c42a4f','weights'],
+  'Turnen':['#6d3fc0','mat'], 'Kampfsport':['#9b1c1c','mat'], 'Yoga':['#0e7f74','mat']};
+const LOGO = `<svg class="mark" viewBox="0 0 64 64" aria-hidden="true"><path d="M12 6h40a8 8 0 0 1 8 8v26a8 8 0 0 1-8 8H26l-12 10v-10h-2a8 8 0 0 1-8-8V14a8 8 0 0 1 8-8z" fill="#ff5a3c"/>
+  <path d="M26 16l16 11-16 11z" fill="#fff"/><circle cx="52" cy="10" r="9" fill="#151a17" stroke="#fff" stroke-width="2"/><path d="M47.5 12l4.5-4.5 4.5 4.5" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+function themeOf(team){
+  const [c, motif] = SPORT_STYLE[team && team.sport] || ['#1f3d33', 'field'];
+  return {color: (team && team.color) || c, motif, sportColor: c};
+}
+function onColor(hex){
+  const n = parseInt(hex.slice(1), 16), ch = v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; };
+  const L = .2126 * ch(n >> 16 & 255) + .7152 * ch(n >> 8 & 255) + .0722 * ch(n & 255);
+  return L > .38 ? '#151a17' : '#ffffff';
+}
+function applyTheme(team){
+  const t = themeOf(team), r = document.documentElement.style;
+  r.setProperty('--bg', t.color); r.setProperty('--chalk', onColor(t.color));
+  const m = document.querySelector('meta[name=theme-color]'); if (m) m.content = t.color;
+  return t;
+}
+const motifSvg = name => `<svg class="motif" viewBox="0 0 200 120" fill="none" stroke="currentColor" stroke-width="3" aria-hidden="true">${MOTIF[name] || MOTIF.field}</svg>`;
+// club logo: downscale in the browser so the stored image stays small
+function readLogo(file){
+  return new Promise((res, rej) => {
+    if (!/^image\/(png|jpeg|webp|svg\+xml|gif)$/.test(file.type)) return rej(new Error('Bitte ein Bild (PNG, JPG, WebP) wählen.'));
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => { const k = Math.min(1, 256 / Math.max(img.width, img.height)), c = document.createElement('canvas');
+      c.width = Math.round(img.width * k) || 1; c.height = Math.round(img.height * k) || 1;
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      let d = c.toDataURL('image/webp', .85); if (!d.startsWith('data:image/webp')) d = c.toDataURL('image/png'); res(d); };
+    img.onerror = () => rej(new Error('Bild konnte nicht gelesen werden.')); img.src = url; });
+}
 const SPORTS = ['Kraftsport','Fitness','Laufen','Yoga','Fußball','Handball','Basketball','Volleyball','Hockey','Eishockey','Tennis','Tischtennis','Badminton','Leichtathletik','Schwimmen','Turnen','Kampfsport','Radsport','Rugby','American Football'];
 
 // Category picker: existing team categories as chips, plus "+ Neu" to type one (it joins the team list on save).
@@ -336,8 +387,8 @@ function sortList(list){
 
 function render(){
   const app = $('#app');
-  if (!S.me) { app.innerHTML = onboarding(); bindOnboarding(); return; }
-  const coach = S.me.role === 'coach', solo = isSolo();
+  if (!S.me) { applyTheme(null); app.innerHTML = onboarding(); bindOnboarding(); return; }
+  const coach = S.me.role === 'coach', solo = isSolo(), theme = applyTheme(S.me.team);
   const relevantOpen = S.posts.filter(p => p.status === 'relevant').length;
   const tabs = solo
     ? [['all','Sammlung'], ['fav','Favoriten'], ['stats','Statistik'], ['team','Einstellungen']]
@@ -359,13 +410,15 @@ function render(){
   const filters = usedCats.length > 1 ? `<div class="filters" role="group" aria-label="Kategorie">
       <button class="pick" data-f="" aria-pressed="${!S.cat}">Alle</button>
       ${usedCats.map(c => `<button class="pick" data-f="${esc(c)}" aria-pressed="${S.cat === c}">${esc(c)}</button>`).join('')}</div>` : '';
-  const sorter = solo ? `<div class="row" style="margin:0 0 12px"><label for="sort" class="small" style="margin:0;color:var(--chalk)">Sortieren</label>
+  const sorter = solo ? `<div class="row" style="margin:0 0 12px"><label for="sort" class="small" style="margin:0">Sortieren</label>
       <select id="sort" style="width:auto;flex:1">${Object.entries(SORTS).map(([k,l]) => `<option value="${k}" ${k === (S.sort || 'new') ? 'selected' : ''}>${l}</option>`).join('')}</select></div>` : '';
   const body = S.tab === 'team' ? teamView(coach) : S.tab === 'stats' ? statsView()
     : `<p class="hint">${esc(hint)}</p>${filters}${sorter}${list.length ? list.map(postCard).join('') : emptyView()}`;
   app.innerHTML = `
-    <header class="top"><h1>Hear Me Coach</h1>
-      <div class="team">${esc(S.me.team.name)} · ${esc(S.me.team.sport)}<br>${esc(S.me.name)}${solo ? '' : ' · ' + (coach ? 'Coach' : 'Spieler')}</div></header>
+    <header class="top">${motifSvg(theme.motif)}
+      ${S.me.team.logo ? `<img class="logo" src="${esc(S.me.team.logo)}" alt="">` : LOGO}
+      <div class="names"><h1>${esc(S.me.team.name)}</h1>
+        <div class="sub">${esc(S.me.team.sport)} · ${esc(S.me.name)}${solo ? '' : ' · ' + (coach ? 'Coach' : 'Spieler')} · Hear Me Coach</div></div></header>
     <nav class="tabs" role="tablist">${tabs.map(([k,l,n]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${S.tab===k}">${l}${n ? `<span class="n">${n}</span>` : ''}</button>`).join('')}</nav>
     <main>${body}</main>
     <button class="fab" id="fab">${solo ? '+ Video speichern' : '+ Link teilen'}</button>`;
@@ -485,6 +538,15 @@ function teamView(coach){
       <label for="tn2">${solo ? 'Name der Sammlung' : 'Mannschaft'}</label><input id="tn2" type="text" maxlength="80" value="${esc(t.name)}">
       <label for="sp">Sportart</label>${sportPicker(t.sport)}
       <div class="row" style="margin-top:10px"><button class="btn" id="saveTeam">Speichern</button></div></section>
+    <section class="card"><h2 style="font-size:26px">Aussehen</h2>
+      <p class="small">Ohne eigene Farbe nimmt die App die Farbe der Sportart. Das Logo erscheint oben im Kopf.</p>
+      <label for="tc">${solo ? 'Farbe' : 'Vereinsfarbe'}</label>
+      <div class="row"><input id="tc" type="color" value="${esc(themeOf(t).color)}" style="width:64px;height:44px;padding:2px;border-radius:10px;border:1.5px solid var(--line)">
+        <button class="btn" id="saveColor">Farbe übernehmen</button>${t.color ? '<button class="btn alt" id="resetColor">Sportfarbe</button>' : ''}</div>
+      <label for="lg">${solo ? 'Logo oder Bild' : 'Vereinslogo'}</label>
+      <div class="row">${t.logo ? `<img src="${esc(t.logo)}" alt="Aktuelles Logo" style="width:56px;height:56px;object-fit:contain;border-radius:12px;border:1px solid var(--line);background:#fff">` : ''}
+        <input id="lg" type="file" accept="image/png,image/jpeg,image/webp" style="flex:1">
+        ${t.logo ? '<button class="btn alt" id="delLogo">Entfernen</button>' : ''}</div></section>
     <section class="card"><h2 style="font-size:26px">Kategorien</h2>
       <p class="small">Neue Kategorien, die beim Speichern eines Videos eingegeben werden, kommen automatisch dazu. Entfernen ändert keine bestehenden Beiträge.</p>
       <div class="catlist">${t.categories.map(c => `<span>${esc(c)}<button data-delcat="${esc(c)}" aria-label="${esc(c)} entfernen">×</button></span>`).join('')}</div>
@@ -508,6 +570,12 @@ function bindTeam(){
     const sport = bindSportPicker();
     $('#saveTeam').onclick = async () => {
       try { await api.call('set_team', {p_token:token(), p_name:$('#tn2').value, p_sport:sport()}); toast('Gespeichert'); await load(); } catch (e) { toast(e.message); } };
+    const style = async (c, l) => { try { await api.call('set_team_style', {p_token:token(), p_color:c, p_logo:l}); toast('Gespeichert'); await load(); } catch (e) { toast(e.message); } };
+    const tc = $('#tc'); tc.oninput = () => applyTheme({...S.me.team, color:tc.value});
+    $('#saveColor').onclick = () => style(tc.value, null);
+    const rc = $('#resetColor'); if (rc) rc.onclick = () => style('', null);
+    $('#lg').onchange = async e => { const f = e.target.files[0]; if (!f) return; try { style(null, await readLogo(f)); } catch (err) { toast(err.message); } };
+    const dl = $('#delLogo'); if (dl) dl.onclick = () => style(null, '');
     $('#addCat').onclick = async () => { const n = $('#newCat').value.trim(); if (!n) return;
       try { await api.call('add_category', {p_token:token(), p_name:n}); await load(); } catch (e) { toast(e.message); } };
     document.querySelectorAll('[data-delcat]').forEach(b => b.onclick = async () => {
@@ -596,7 +664,7 @@ function openReview(p){
 // ---------- onboarding ----------
 function onboarding(){
   return `<main><section class="hero">
-      <h1>Hear Me Coach</h1>
+      <div class="row" style="gap:12px">${LOGO.replace('class="mark"', 'class="mark" style="width:56px;height:56px"')}<h1>Hear Me Coach</h1></div>
       <p>Ihr findet starke Übungen auf TikTok und Instagram. Teilt sie hier, stimmt ab, und was die Mannschaft feiert, landet beim Coach. Oder sammle Übungen nur für dich und behalte im Blick, was du trainiert hast.</p>
       <svg class="board" viewBox="0 0 640 150" role="img" aria-label="Ablauf: teilen, upvoten, Coach, Training">
         <g fill="none" stroke="#f3f7f1" stroke-width="3" stroke-linecap="round" opacity=".9">
@@ -626,7 +694,7 @@ function onboarding(){
       <form id="soloForm"><label for="sn">Dein Name</label><input id="sn" type="text" maxlength="40" required>
         <label for="ssp">Sportart</label>${sportPicker('Kraftsport', 'ssp')}
         <div class="row" style="margin-top:14px"><button class="btn">Sammlung starten</button></div></form></section>
-    <p class="small" style="color:var(--chalk)">Beta: Es gibt kein Passwort. Der Zugang ist in diesem Browser gespeichert.</p></main>`;
+    <p class="small">Beta: Es gibt kein Passwort. Der Zugang ist in diesem Browser gespeichert.</p></main>`;
 }
 function bindOnboarding(){
   const done = r => { store.set('token', r.token); S.tab = r.team.mode === 'solo' ? 'all' : r.role === 'coach' ? 'coach' : 'pool'; load().then(handleShare); };
