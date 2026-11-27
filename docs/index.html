@@ -35,7 +35,13 @@ button{cursor:pointer}
 .top .motif{position:absolute;right:-10px;top:-10px;height:calc(100% + 20px);width:auto;opacity:.16;pointer-events:none}
 .top .logo{flex:none;width:52px;height:52px;border-radius:14px;object-fit:contain;background:#fff;padding:4px;box-shadow:0 2px 8px rgba(0,0,0,.2)}
 .top .mark{flex:none;width:44px;height:44px}
-.top .names{position:relative;min-width:0}
+.top .names{position:relative;min-width:0;flex:1}
+.mode{position:relative;flex:none;display:flex;align-items:center;gap:6px;min-height:40px;padding:0 12px;border-radius:12px;border:0;
+  background:color-mix(in srgb,var(--chalk) 18%,transparent);color:var(--chalk);font-weight:600;font-size:14px}
+.mode svg{width:20px;height:20px}
+.hero .mode{margin-left:auto}
+.hero .row{flex-wrap:nowrap}
+@media(max-width:520px){.mode span{display:none}.mode{padding:0 10px}}
 .top h1{font-size:26px;letter-spacing:.01em;overflow-wrap:anywhere}
 .top .sub{font-size:14px;opacity:.85}
 .tabs{display:flex;gap:6px;padding:10px max(4vw,14px);overflow-x:auto;position:sticky;top:0;z-index:4;
@@ -168,16 +174,16 @@ const remote = {
 // ---------- backend: in-browser demo (same API) ----------
 function makeDemo(kind){
   const now = Date.now(), h = 36e5, d = 24*h;
-  const solo = kind === 'solo';
-  const team = solo
+  const solo = kind === 'solo', fresh = kind === 'fresh';
+  let team = fresh ? null : solo
     ? {id:'t2', name:'Mein Training', sport:'Kraftsport', mode:'solo', threshold:3, player_code:null, coach_code:null,
        categories:['Aufwärmen','Brust','Rücken','Schultern','Arme','Beine','Core','Cardio','Dehnen']}
     : {id:'t1', name:'Damen 1 TV Musterstadt', sport:'Volleyball', mode:'team', threshold:3, player_code:'KICK42', coach_code:'COACH7',
        categories:['Aufwärmen','Technik','Spielform','Taktik','Abschluss','Kondition','Ausklang']};
-  const members = solo ? [{id:'s', name:'Jan', role:'coach'}] : [
+  let members = fresh ? [] : solo ? [{id:'s', name:'Jan', role:'coach'}] : [
     {id:'c', name:'Coach Kim', role:'coach'}, {id:'a', name:'Alina', role:'player'},
     {id:'b', name:'Bea', role:'player'}, {id:'d', name:'Dana', role:'player'}, {id:'e', name:'Elif', role:'player'}];
-  let posts = solo ? [
+  let posts = fresh ? [] : solo ? [
     {id:'g1', url:'https://www.tiktok.com/@gym/video/11', platform:'tiktok', title:'Bankdrücken mit Pause auf der Brust', category:'Brust', comment:'', by:'s', status:'adopted', t:now-70*d, votes:[], review:{stars:5}},
     {id:'g2', url:'https://www.instagram.com/reel/g2', platform:'instagram', title:'Rudern einarmig, Fokus Schulterblatt', category:'Rücken', comment:'', by:'s', status:'adopted', t:now-60*d, votes:[], review:{stars:4}},
     {id:'g3', url:'https://www.youtube.com/shorts/g3abc12', platform:'youtube', title:'Bulgarian Split Squats sauber', category:'Beine', comment:'Knie über Fuß', by:'s', status:'adopted', t:now-50*d, votes:[], review:{stars:5}},
@@ -192,7 +198,7 @@ function makeDemo(kind){
     {id:'p4', url:'https://www.tiktok.com/@athletik/video/2', platform:'tiktok', title:'Sprungkraft-Zirkel ohne Geräte', category:'Kondition', comment:'Für die Vorbereitung', anonymous:true, by:'e', status:'new', t:now-2*h, votes:[]}];
   // seeded workout log: a believable rhythm over the last ~10 weeks
   let logs = [];
-  if (solo) {
+  if (fresh) {} else if (solo) {
     const plan = [['g1',3],['g2',3],['g3',4],['g4',6]];
     for (let day = 68; day >= 1; day--) for (const [id, every] of plan)
       if (day % every === 0 && posts.find(p => p.id === id).t < now - day*d) logs.push({post_id:id, by:'s', t:now - day*d + 18*h});
@@ -202,11 +208,29 @@ function makeDemo(kind){
   const ensureCat = n => { n = String(n || '').trim().replace(/\s+/g, ' ').slice(0, 30); if (!n) return null;
     const ex = team.categories.find(c => c.toLowerCase() === n.toLowerCase()); if (ex) return ex; team.categories.push(n); return n; };
   const name = id => members.find(m => m.id === id)?.name;
-  let me = members[0].id;
+  let me = members[0] ? members[0].id : null;
+  const code = () => Array.from({length:6}, () => 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'[Math.floor(Math.random() * 32)]).join('');
   const api = {
-    setMe(id){ me = id; }, members,
+    setMe(id){ me = id; }, get members(){ return members; }, get team(){ return team; },
     async call(fn, a){
       await new Promise(r => setTimeout(r, 80));
+      if (fn === 'create_team') {
+        const sm = a.p_mode === 'solo';
+        team = {id:'tf', name:a.p_team_name.trim() || 'Mein Team', sport:a.p_sport || 'Allgemein', mode:sm ? 'solo' : 'team', threshold:3, color:null, logo:null,
+          player_code:sm ? null : code(), coach_code:sm ? null : code(),
+          categories: sm ? ['Aufwärmen','Brust','Rücken','Schultern','Arme','Beine','Core','Cardio','Dehnen'] : ['Aufwärmen','Technik','Spielform','Taktik','Abschluss','Kondition','Ausklang']};
+        members = [{id:'c', name:a.p_coach_name.trim() || 'Ich', role:'coach'}];
+        if (!sm) members.push({id:'x1', name:'Mitspieler Alex', role:'player'}, {id:'x2', name:'Mitspielerin Bo', role:'player'}, {id:'x3', name:'Mitspieler Chris', role:'player'});
+        posts = []; logs = []; me = 'c';
+        return {...(await api.call('whoami', {})), token:'demo'};
+      }
+      if (fn === 'join_team') {
+        const c = String(a.p_code || '').trim().toUpperCase();
+        if (!team || (c !== team.player_code && c !== team.coach_code)) throw new Error(ERR.invalid_code);
+        const id = 'j' + members.length; members.push({id, name:a.p_name.trim() || 'Gast', role: c === team.coach_code ? 'coach' : 'player'}); me = id;
+        return {...(await api.call('whoami', {})), token:'demo'};
+      }
+      if (!team || !members.find(x => x.id === me)) throw new Error(ERR.not_authorized);
       const m = members.find(x => x.id === me), coach = m.role === 'coach';
       const find = id => { const p = posts.find(x => x.id === id); if (!p) throw new Error(ERR.not_found); return p; };
       const mine = id => logs.filter(l => l.post_id === id && l.by === me);
@@ -250,7 +274,7 @@ function makeDemo(kind){
           return {post_id:l.post_id, done_at:new Date(l.t).toISOString(), title:p.title, category:p.category, platform:p.platform}; });
         case 'set_threshold': { if (!coach) throw new Error(ERR.coach_only); team.threshold = a.p_threshold;
           posts.forEach(p => { if (p.status === 'new' && p.votes.length >= team.threshold) p.status = 'relevant'; }); return null; }
-        case 'leave_team': return null;
+        case 'leave_team': if (fresh) { team = null; members = []; posts = []; logs = []; me = null; } return null;
       }
     }
   };
@@ -280,6 +304,22 @@ async function preview(u){
 }
 
 // ---------- state ----------
+// ---------- light / dark / auto ----------
+const MODES = {auto:['Automatisch','<circle cx="12" cy="12" r="8" fill="none" stroke="currentColor" stroke-width="2"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/>'],
+  light:['Hell','<circle cx="12" cy="12" r="4.5" fill="currentColor"/><g stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v2.5M12 19.5V22M2 12h2.5M19.5 12H22M4.9 4.9l1.8 1.8M17.3 17.3l1.8 1.8M4.9 19.1l1.8-1.8M17.3 6.7l1.8-1.8"/></g>'],
+  dark:['Dunkel','<path d="M20 14.5A8.5 8.5 0 0 1 9.5 4 8.5 8.5 0 1 0 20 14.5z" fill="currentColor"/>']};
+let MODE = store.get('mode') || 'auto';
+function applyMode(){
+  const r = document.documentElement;
+  if (MODE === 'auto') { if (r.dataset.hmcMode) { r.removeAttribute('data-theme'); delete r.dataset.hmcMode; } }
+  else { r.dataset.theme = MODE; r.dataset.hmcMode = '1'; }
+}
+const modeBtn = () => `<button class="mode" id="modeBtn" type="button" aria-label="Darstellung: ${MODES[MODE][0]}, tippen zum Wechseln">
+  <svg viewBox="0 0 24 24" aria-hidden="true">${MODES[MODE][1]}</svg><span>${MODES[MODE][0]}</span></button>`;
+function bindMode(){ const b = $('#modeBtn'); if (b) b.onclick = () => {
+  MODE = {auto:'light', light:'dark', dark:'auto'}[MODE]; store.set('mode', MODE); applyMode(); toast('Darstellung: ' + MODES[MODE][0]); render(); }; }
+applyMode();
+const demoHooks = {refresh(){}, fresh(){}};
 let api = remote, demo = null, S = {me:null, posts:[], tab:'pool', open:null, cat:''};
 // ---------- theme: colour + field markings per sport, overridable by club colour and logo ----------
 const MOTIF = {
@@ -366,7 +406,7 @@ async function load(){
     if (S.tab === 'stats') S.log = await api.call('list_my_log', {p_token:token()});
     render();
   } catch (e) {
-    if (!demo && /neu beitreten/.test(e.message)) { store.del('token'); S.me = null; render(); }
+    if (/neu beitreten/.test(e.message)) { if (!demo) store.del('token'); S.me = null; render(); }
     else toast(e.message);
   }
 }
@@ -387,7 +427,7 @@ function sortList(list){
 
 function render(){
   const app = $('#app');
-  if (!S.me) { applyTheme(null); app.innerHTML = onboarding(); bindOnboarding(); return; }
+  if (!S.me) { applyTheme(null); app.innerHTML = onboarding(); bindOnboarding(); bindMode(); return; }
   const coach = S.me.role === 'coach', solo = isSolo(), theme = applyTheme(S.me.team);
   const relevantOpen = S.posts.filter(p => p.status === 'relevant').length;
   const tabs = solo
@@ -418,7 +458,7 @@ function render(){
     <header class="top">${motifSvg(theme.motif)}
       ${S.me.team.logo ? `<img class="logo" src="${esc(S.me.team.logo)}" alt="">` : LOGO}
       <div class="names"><h1>${esc(S.me.team.name)}</h1>
-        <div class="sub">${esc(S.me.team.sport)} · ${esc(S.me.name)}${solo ? '' : ' · ' + (coach ? 'Coach' : 'Spieler')} · Hear Me Coach</div></div></header>
+        <div class="sub">${esc(S.me.team.sport)} · ${esc(S.me.name)}${solo ? '' : ' · ' + (coach ? 'Coach' : 'Spieler')} · Hear Me Coach</div></div>${modeBtn()}</header>
     <nav class="tabs" role="tablist">${tabs.map(([k,l,n]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${S.tab===k}">${l}${n ? `<span class="n">${n}</span>` : ''}</button>`).join('')}</nav>
     <main>${body}</main>
     <button class="fab" id="fab">${solo ? '+ Video speichern' : '+ Link teilen'}</button>`;
@@ -428,7 +468,7 @@ function render(){
   app.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { S.cat = b.dataset.f; render(); });
   const so = $('#sort'); if (so) so.onchange = () => { S.sort = so.value; render(); };
   $('#fab').onclick = () => openShare('');
-  bindPosts(); if (S.tab === 'team') bindTeam();
+  bindPosts(); bindMode(); if (S.tab === 'team') bindTeam();
 }
 
 function emptyView(){
@@ -582,7 +622,8 @@ function bindTeam(){
       try { await api.call('delete_category', {p_token:token(), p_name:b.dataset.delcat}); await load(); } catch (e) { toast(e.message); } });
   }
   $('#leave').onclick = () => confirmSheet('Mannschaft verlassen?', 'Dein Profil und alle deine geteilten Links werden gelöscht.', 'Verlassen', async () => {
-    if (!demo) await api.call('leave_team', {p_token:token()}); store.del('token'); S.me = null; render(); });
+    if (demo) { demoHooks.fresh(); return; }
+    await api.call('leave_team', {p_token:token()}); store.del('token'); S.me = null; render(); });
 }
 
 // ---------- sheets ----------
@@ -664,7 +705,7 @@ function openReview(p){
 // ---------- onboarding ----------
 function onboarding(){
   return `<main><section class="hero">
-      <div class="row" style="gap:12px">${LOGO.replace('class="mark"', 'class="mark" style="width:56px;height:56px"')}<h1>Hear Me Coach</h1></div>
+      <div class="row" style="gap:12px">${LOGO.replace('class="mark"', 'class="mark" style="width:56px;height:56px"')}<h1>Hear Me Coach</h1>${modeBtn()}</div>
       <p>Ihr findet starke Übungen auf TikTok und Instagram. Teilt sie hier, stimmt ab, und was die Mannschaft feiert, landet beim Coach. Oder sammle Übungen nur für dich und behalte im Blick, was du trainiert hast.</p>
       <svg class="board" viewBox="0 0 640 150" role="img" aria-label="Ablauf: teilen, upvoten, Coach, Training">
         <g fill="none" stroke="#f3f7f1" stroke-width="3" stroke-linecap="round" opacity=".9">
@@ -697,7 +738,8 @@ function onboarding(){
     <p class="small">Beta: Es gibt kein Passwort. Der Zugang ist in diesem Browser gespeichert.</p></main>`;
 }
 function bindOnboarding(){
-  const done = r => { store.set('token', r.token); S.tab = r.team.mode === 'solo' ? 'all' : r.role === 'coach' ? 'coach' : 'pool'; load().then(handleShare); };
+  const done = r => { if (!demo) store.set('token', r.token); S.tab = r.team.mode === 'solo' ? 'all' : r.role === 'coach' ? 'coach' : 'pool';
+    demoHooks.refresh(); load().then(handleShare); };
   $('#joinForm').onsubmit = async e => { e.preventDefault();
     try { done(await api.call('join_team', {p_code:$('#jc').value, p_name:$('#jn').value})); } catch (err) { toast(err.message); } };
   const sport = bindSportPicker();
@@ -725,14 +767,28 @@ async function start(){
   let reachable = !q.has('demo');
   if (reachable) { try { await fetch(CFG.url + '/rest/v1/', {headers:{apikey:CFG.key}, method:'HEAD'}); } catch { reachable = false; } }
   if (!reachable) {
-    const demos = {team: makeDemo('team'), solo: makeDemo('solo')};
+    const demos = {team: makeDemo('team'), solo: makeDemo('solo'), fresh: makeDemo('fresh')};
+    let cur = 'team:c';
     demo = demos.team; api = demo;
     const bar = $('#demo'); bar.hidden = false;
-    bar.innerHTML = `<b>Demo</b> mit Beispieldaten. Ansicht als: <select id="who">
-      <optgroup label="Mannschaft (Volleyball)">${demos.team.members.map(m => `<option value="team:${m.id}">${esc(m.name)}${m.role === 'coach' ? ' (Coach)' : ''}</option>`).join('')}</optgroup>
-      <optgroup label="Allein trainieren"><option value="solo:s">Jan (Kraftsport, solo)</option></optgroup></select>`;
-    $('#who').onchange = async e => { const [k, id] = e.target.value.split(':'); demo = demos[k]; api = demo; demo.setMe(id);
-      S.tab = k === 'solo' ? 'all' : id === 'c' ? 'coach' : 'pool'; S.cat = ''; S.log = null; await load(); };
+    const opt = (v, l) => `<option value="${v}" ${v === cur ? 'selected' : ''}>${esc(l)}</option>`;
+    demoHooks.refresh = () => {
+      if (demo === demos.fresh && demos.fresh.members.length) cur = 'fresh:' + (demos.fresh.members.find(m => m.id === 'c') || demos.fresh.members[demos.fresh.members.length - 1]).id;
+      const f = demos.fresh.team;
+      bar.innerHTML = `<b>Demo</b> Ansicht als: <select id="who">
+        <optgroup label="Mannschaft (Volleyball)">${demos.team.members.map(m => opt('team:' + m.id, m.name + (m.role === 'coach' ? ' (Coach)' : ''))).join('')}</optgroup>
+        <optgroup label="Allein trainieren">${opt('solo:s', 'Jan (Kraftsport, solo)')}</optgroup>
+        <optgroup label="Selbst ausprobieren">${opt('fresh:', 'Von vorn starten (leer)')}
+          ${f ? demos.fresh.members.map(m => opt('fresh:' + m.id, (f.mode === 'solo' ? 'Deine Sammlung: ' : f.name + ': ') + m.name + (m.role === 'coach' && f.mode !== 'solo' ? ' (Coach)' : ''))).join('') : ''}</optgroup></select>`;
+      $('#who').onchange = async e => { const [k, id] = e.target.value.split(':'); cur = e.target.value;
+        if (k === 'fresh' && !id) return demoHooks.fresh();
+        demo = demos[k]; api = demo; demo.setMe(id);
+        S.tab = k === 'solo' ? 'all' : (demo.members.find(m => m.id === id) || {}).role === 'coach' ? (demo.team.mode === 'solo' ? 'all' : 'coach') : 'pool';
+        S.cat = ''; S.log = null; await load(); };
+    };
+    demoHooks.fresh = () => { demos.fresh = makeDemo('fresh'); demo = demos.fresh; api = demo; cur = 'fresh:';
+      S.me = null; S.posts = []; S.log = null; S.cat = ''; demoHooks.refresh(); render(); scrollTo(0, 0); };
+    demoHooks.refresh();
     S.tab = 'coach'; await load(); return;
   }
   if (store.get('token')) { await load(); handleShare(); } else render();
