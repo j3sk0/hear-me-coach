@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Hear Me Coach</title>
+<meta name="theme-color" content="#0b4d33">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Barlow:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: sideline clipboard, quick and friendly, nothing corporate
+   IDEA: the chalked tactics board on the pitch, posts are cards pinned to it
+   PICTURE: the live pool of shared clips with upvote meters filling toward the coach line
+   COLOUR and TYPE: pitch green field, chalk white cards, signal coral accent; Barlow Condensed + Barlow
+   LAYOUT: app shell, top bar, tabs, single card column, floating share button */
+:root{color-scheme:light dark;
+  --bg:light-dark(#0b4d33,#06281b);--field2:light-dark(#0e5a3c,#0a3423);
+  --card:light-dark(#fbfcf8,#14201a);--ink:light-dark(#13201a,#e8efe9);--soft:light-dark(#5b6b62,#9db0a4);
+  --line:light-dark(#dfe6df,#27382e);--chalk:#f3f7f1;--acc:#ff5a3c;--acc2:light-dark(#ffe7e1,#3a1d16);
+  --ok:light-dark(#0f7a4a,#5fd39a);--okbg:light-dark(#e3f4ea,#12321f)}
+:root[data-theme=light]{color-scheme:light}:root[data-theme=dark]{color-scheme:dark}
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font:16px/1.5 Barlow,system-ui,sans-serif;overflow-x:clip;min-height:100vh;
+  background-image:repeating-linear-gradient(90deg,transparent 0 64px,var(--field2) 64px 128px)}
+h1,h2,h3{font-family:"Barlow Condensed",Barlow,sans-serif;font-weight:700;line-height:1.05;margin:0;text-wrap:balance}
+button,input,textarea,select{font:inherit;font-size:16px}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--acc);outline-offset:2px}
+.top{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:12px;padding:12px max(4vw,14px);
+  background:color-mix(in srgb,var(--bg) 92%,transparent);backdrop-filter:blur(8px);color:var(--chalk)}
+.top h1{font-size:28px;letter-spacing:.01em}
+.top .team{margin-left:auto;font-size:14px;opacity:.85;text-align:right}
+.tabs{display:flex;gap:6px;padding:0 max(4vw,14px) 10px;overflow-x:auto;position:sticky;top:56px;z-index:4;
+  background:color-mix(in srgb,var(--bg) 92%,transparent)}
+.tab{flex:none;min-height:40px;padding:6px 14px;border-radius:999px;border:1.5px solid color-mix(in srgb,var(--chalk) 40%,transparent);
+  background:transparent;color:var(--chalk);font-weight:600}
+.tab[aria-selected=true]{background:var(--chalk);color:#0b4d33;border-color:var(--chalk)}
+.tab .n{display:inline-block;min-width:20px;margin-left:6px;padding:0 6px;border-radius:999px;background:var(--acc);color:#fff;font-size:13px}
+main{max-width:720px;margin:0 auto;padding:6px max(4vw,14px) 120px}
+.hint{color:var(--chalk);opacity:.85;font-size:14px;margin:6px 2px 12px}
+.card{background:var(--card);border-radius:16px;padding:14px;margin:0 0 14px;box-shadow:0 2px 0 rgba(0,0,0,.18),0 10px 24px rgba(0,0,0,.18)}
+.post{display:grid;grid-template-columns:96px minmax(0,1fr);gap:12px}
+.thumb{width:96px;height:128px;border-radius:10px;overflow:hidden;display:grid;place-items:center;color:#fff;
+  font-family:"Barlow Condensed";font-weight:700;font-size:18px;text-decoration:none;position:relative}
+.thumb img{width:100%;height:100%;object-fit:cover}
+.thumb .pl{position:absolute;left:6px;bottom:6px;font-size:12px;background:rgba(0,0,0,.55);padding:1px 6px;border-radius:6px}
+.p-tiktok{background:linear-gradient(150deg,#111 40%,#25f4ee 60%,#fe2c55)}
+.p-instagram{background:linear-gradient(140deg,#feda75,#d62976 55%,#4f5bd5)}
+.p-youtube{background:#e62117}.p-facebook{background:#1877f2}.p-web{background:#4b5a52}
+.meta{font-size:14px;color:var(--soft);display:flex;flex-wrap:wrap;gap:4px 10px}
+.title{font-size:19px;font-weight:600;margin:2px 0 4px;overflow-wrap:anywhere}
+.comment{margin:4px 0 8px;font-size:15px}
+.chip{display:inline-block;padding:1px 8px;border-radius:999px;font-size:13px;font-weight:600;background:var(--line);color:var(--ink)}
+.s-relevant{background:var(--acc2);color:var(--acc)}.s-adopted{background:var(--okbg);color:var(--ok)}
+.s-rejected{background:var(--line);color:var(--soft)}.s-seen{background:var(--line)}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.vote{display:flex;align-items:center;gap:10px;margin-top:8px}
+.up{min-height:44px;min-width:76px;padding:0 14px;border-radius:12px;border:2px solid var(--line);background:transparent;color:var(--ink);font-weight:700}
+.up[aria-pressed=true]{background:var(--acc);border-color:var(--acc);color:#fff}
+.up:disabled{opacity:.5;cursor:default}
+.meter{flex:1;height:8px;border-radius:4px;background:var(--line);overflow:hidden;position:relative}
+.meter i{position:absolute;inset:0 auto 0 0;background:var(--acc);border-radius:4px;transition:width .3s}
+.mlab{font-size:13px;color:var(--soft);white-space:nowrap}
+.btn{min-height:44px;padding:0 16px;border-radius:12px;border:0;background:var(--bg);color:var(--chalk);font-weight:600}
+.btn.alt{background:transparent;color:var(--ink);border:1.5px solid var(--line)}
+.btn.acc{background:var(--acc);color:#fff}
+.link{color:inherit;font-weight:600}
+.fab{position:fixed;right:max(4vw,16px);bottom:calc(18px + env(safe-area-inset-bottom));z-index:6;min-height:56px;padding:0 22px;border-radius:999px;
+  border:0;background:var(--acc);color:#fff;font-weight:700;font-size:17px;box-shadow:0 8px 24px rgba(0,0,0,.35)}
+label{display:block;font-weight:600;margin:12px 0 4px}
+input[type=text],input[type=url],input[type=number],textarea,select{width:100%;min-height:44px;padding:10px 12px;border-radius:10px;border:1.5px solid var(--line);background:var(--card);color:var(--ink)}
+textarea{min-height:80px;resize:vertical}
+.switch{display:flex;align-items:center;gap:10px;margin-top:12px;font-weight:600}
+.switch input{width:22px;height:22px;accent-color:var(--acc)}
+.small{font-size:14px;color:var(--soft)}
+.sheet{position:fixed;inset:0;z-index:10;display:none;background:rgba(0,0,0,.5);align-items:flex-end;justify-content:center}
+.sheet.open{display:flex}
+.sheet .card{width:min(640px,100%);margin:0;border-radius:18px 18px 0 0;max-height:92vh;overflow:auto;padding:18px 18px calc(18px + env(safe-area-inset-bottom))}
+.sheet h2{font-size:28px}
+.review{margin-top:10px;padding-top:10px;border-top:1.5px dashed var(--line)}
+.stars button{min-width:44px;min-height:44px;border:0;background:transparent;font-size:26px;color:var(--line);padding:0}
+.stars button.on{color:#f5a623}
+.empty{color:var(--chalk);text-align:center;padding:40px 10px}
+.empty h2{font-size:30px;margin-bottom:6px}
+.code{font-family:"Barlow Condensed";font-size:34px;letter-spacing:.12em;font-weight:700}
+.toast{position:fixed;left:50%;bottom:90px;transform:translateX(-50%);z-index:20;background:#13201a;color:#fff;padding:10px 16px;border-radius:12px;
+  font-size:15px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw}
+.toast.on{opacity:1}
+.demo{background:var(--acc);color:#fff;font-size:14px;padding:8px max(4vw,14px);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.demo select{width:auto;min-height:36px;padding:4px 8px;font-size:15px}
+.hero{color:var(--chalk);padding:28px 4px 12px}
+.hero h1{font-size:clamp(40px,10vw,56px)}
+.hero p{font-size:18px;opacity:.9;max-width:34em}
+.board{display:block;width:100%;height:auto;margin:10px 0 6px}
+.picks{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
+.pick{min-height:40px;padding:4px 14px;border-radius:999px;border:1.5px solid var(--line);background:transparent;color:var(--ink);font-weight:600}
+.pick[aria-pressed=true]{background:var(--bg);border-color:var(--bg);color:var(--chalk)}
+.pick.new{border-style:dashed}
+.filters{display:flex;gap:6px;overflow-x:auto;margin:0 0 12px;padding-bottom:2px}
+.filters .pick{flex:none;color:var(--chalk);border-color:color-mix(in srgb,var(--chalk) 35%,transparent)}
+.filters .pick[aria-pressed=true]{background:var(--acc);border-color:var(--acc);color:#fff}
+.cat{display:inline-block;padding:1px 8px;border-radius:6px;font-size:13px;font-weight:600;background:var(--bg);color:var(--chalk)}
+.catlist{display:flex;flex-wrap:wrap;gap:8px;margin:8px 0}
+.catlist span{display:inline-flex;align-items:center;gap:2px;padding-left:12px;border-radius:999px;border:1.5px solid var(--line);font-weight:600}
+.stars.mini{display:flex;margin-top:4px}.stars.mini button{min-width:40px;min-height:40px;font-size:24px}
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:12px 0}
+.kpis div{background:var(--okbg);border-radius:12px;padding:10px;display:flex;flex-direction:column}
+.kpis b{font-family:"Barlow Condensed";font-size:clamp(28px,8vw,40px);line-height:1;color:var(--ok)}
+.kpis span{font-size:13px;color:var(--soft)}
+@media(max-width:420px){.kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.weeks{display:grid;grid-template-columns:repeat(12,minmax(0,1fr));gap:4px;height:170px;align-items:end;margin-top:10px}
+.wk{display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%}
+.wk i{display:block;width:100%;max-width:26px;background:var(--acc);border-radius:4px 4px 0 0;min-height:2px}
+.wn{font-size:13px;font-weight:600;color:var(--soft)}.wl{font-size:11px;color:var(--soft);margin-top:4px;white-space:nowrap}
+@media(max-width:420px){.wl{font-size:9px}}
+.bar{display:grid;grid-template-columns:7.5em minmax(0,1fr) 2.5em;gap:8px;align-items:center;margin:8px 0}
+.bar div{height:12px;background:var(--line);border-radius:6px;overflow:hidden}.bar i{display:block;height:100%;background:var(--bg)}
+.bar b{text-align:right}.bar span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.top5{margin:8px 0;padding-left:1.4em}.top5 li{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line)}
+.top5 b{white-space:nowrap}
+.catlist button{min-width:40px;min-height:40px;border:0;background:transparent;color:var(--soft);font-size:20px}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div id="demo" class="demo" hidden></div>
+<div id="app"></div>
+<div id="sheet" class="sheet" role="dialog" aria-modal="true"><div class="card" id="sheetBody"></div></div>
+<div id="toast" class="toast" role="status"></div>
+<script>
+{
+const CFG = {
+  url: 'https://ikmuivznwysbxlwxzxrd.supabase.co',
+  key: 'sb_publishable_ptC5If9CNCCN_UxoGGVLfA_LMU9o_QM'
+};
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const store = {
+  get(k){ try { return JSON.parse(localStorage.getItem('hmc_'+k)); } catch { return null; } },
+  set(k,v){ try { localStorage.setItem('hmc_'+k, JSON.stringify(v)); } catch {} },
+  del(k){ try { localStorage.removeItem('hmc_'+k); } catch {} }
+};
+const ERR = {invalid_code:'Code nicht gefunden.', not_authorized:'Bitte neu beitreten.', invalid_url:'Das sieht nicht wie ein Link aus.',
+  own_post:'Eigene Beiträge kannst du nicht upvoten.', coach_only:'Nur für den Coach.', not_allowed:'Das darfst du nicht.', not_found:'Beitrag nicht gefunden.'};
+const STATUS = {new:'Neu', relevant:'Beim Coach', seen:'Angeschaut', adopted:'Ins Training aufgenommen', rejected:'Abgelehnt'};
+const PL = {tiktok:'TikTok', instagram:'Instagram', youtube:'YouTube', facebook:'Facebook', web:'Link'};
+
+// ---------- backend: Supabase RPC ----------
+const remote = {
+  async call(fn, args){
+    const r = await fetch(`${CFG.url}/rest/v1/rpc/${fn}`, {method:'POST',
+      headers:{'apikey':CFG.key,'Content-Type':'application/json'}, body:JSON.stringify(args)});
+    const t = await r.text(); const j = t ? JSON.parse(t) : null;
+    if (!r.ok) { const m = (j && j.message) || 'Fehler'; throw new Error(ERR[m] || m); }
+    return j;
+  }
+};
+
+// ---------- backend: in-browser demo (same API) ----------
+function makeDemo(kind){
+  const now = Date.now(), h = 36e5, d = 24*h;
+  const solo = kind === 'solo';
+  const team = solo
+    ? {id:'t2', name:'Mein Training', sport:'Kraftsport', mode:'solo', threshold:3, player_code:null, coach_code:null,
+       categories:['Aufwärmen','Brust','Rücken','Schultern','Arme','Beine','Core','Cardio','Dehnen']}
+    : {id:'t1', name:'Damen 1 TV Musterstadt', sport:'Volleyball', mode:'team', threshold:3, player_code:'KICK42', coach_code:'COACH7',
+       categories:['Aufwärmen','Technik','Spielform','Taktik','Abschluss','Kondition','Ausklang']};
+  const members = solo ? [{id:'s', name:'Jan', role:'coach'}] : [
+    {id:'c', name:'Coach Kim', role:'coach'}, {id:'a', name:'Alina', role:'player'},
+    {id:'b', name:'Bea', role:'player'}, {id:'d', name:'Dana', role:'player'}, {id:'e', name:'Elif', role:'player'}];
+  let posts = solo ? [
+    {id:'g1', url:'https://www.tiktok.com/@gym/video/11', platform:'tiktok', title:'Bankdrücken mit Pause auf der Brust', category:'Brust', comment:'', by:'s', status:'adopted', t:now-70*d, votes:[], review:{stars:5}},
+    {id:'g2', url:'https://www.instagram.com/reel/g2', platform:'instagram', title:'Rudern einarmig, Fokus Schulterblatt', category:'Rücken', comment:'', by:'s', status:'adopted', t:now-60*d, votes:[], review:{stars:4}},
+    {id:'g3', url:'https://www.youtube.com/shorts/g3abc12', platform:'youtube', title:'Bulgarian Split Squats sauber', category:'Beine', comment:'Knie über Fuß', by:'s', status:'adopted', t:now-50*d, votes:[], review:{stars:5}},
+    {id:'g4', url:'https://www.tiktok.com/@gym/video/14', platform:'tiktok', title:'Hollow Hold Progression', category:'Core', comment:'', by:'s', status:'seen', t:now-30*d, votes:[], review:{stars:3}},
+    {id:'g5', url:'https://www.instagram.com/reel/g5', platform:'instagram', title:'Bizeps-Curls mit Band', category:'Arme', comment:'Fand ich langweilig', by:'s', status:'rejected', t:now-20*d, votes:[], review:{stars:2}},
+    {id:'g6', url:'https://www.tiktok.com/@mobility/video/16', platform:'tiktok', title:'Hüfte öffnen in 5 Minuten', category:'Dehnen', comment:'', by:'s', status:'new', t:now-2*d, votes:[]}]
+  : [
+    {id:'p1', url:'https://www.tiktok.com/@trainingdrills/video/1', platform:'tiktok', title:'Annahme unter Druck, drei Bälle hintereinander', category:'Technik', comment:'Unsere Annahme bricht im dritten Satz immer ein.', anonymous:false, by:'a', status:'relevant', t:now-30*h, votes:['b','d','e']},
+    {id:'p2', url:'https://www.instagram.com/reel/abc', platform:'instagram', title:'Mobilisation mit Band vor dem Spiel', category:'Aufwärmen', comment:'', anonymous:true, by:'b', status:'new', t:now-5*h, votes:['a']},
+    {id:'p3', url:'https://www.youtube.com/shorts/xyz123', platform:'youtube', title:'Block-Timing gegen den schnellen Angriff', category:'Taktik', comment:'Könnten wir vor dem Spiel am Samstag testen.', anonymous:false, by:'d', status:'adopted', t:now-80*h, votes:['a','b','e'],
+      review:{stars:5, note:'Kommt Dienstag in Block 2, 15 Minuten.', note_public:true}},
+    {id:'p4', url:'https://www.tiktok.com/@athletik/video/2', platform:'tiktok', title:'Sprungkraft-Zirkel ohne Geräte', category:'Kondition', comment:'Für die Vorbereitung', anonymous:true, by:'e', status:'new', t:now-2*h, votes:[]}];
+  // seeded workout log: a believable rhythm over the last ~10 weeks
+  let logs = [];
+  if (solo) {
+    const plan = [['g1',3],['g2',3],['g3',4],['g4',6]];
+    for (let day = 68; day >= 1; day--) for (const [id, every] of plan)
+      if (day % every === 0 && posts.find(p => p.id === id).t < now - day*d) logs.push({post_id:id, by:'s', t:now - day*d + 18*h});
+  } else {
+    [5,3,1].forEach(day => logs.push({post_id:'p3', by:'c', t:now - day*d}));
+  }
+  const ensureCat = n => { n = String(n || '').trim().replace(/\s+/g, ' ').slice(0, 30); if (!n) return null;
+    const ex = team.categories.find(c => c.toLowerCase() === n.toLowerCase()); if (ex) return ex; team.categories.push(n); return n; };
+  const name = id => members.find(m => m.id === id)?.name;
+  let me = members[0].id;
+  const api = {
+    setMe(id){ me = id; }, members,
+    async call(fn, a){
+      await new Promise(r => setTimeout(r, 80));
+      const m = members.find(x => x.id === me), coach = m.role === 'coach';
+      const find = id => { const p = posts.find(x => x.id === id); if (!p) throw new Error(ERR.not_found); return p; };
+      const mine = id => logs.filter(l => l.post_id === id && l.by === me);
+      switch (fn) {
+        case 'whoami': return {member_id:m.id, name:m.name, role:m.role, team:{...team, categories:[...team.categories], coach_code: coach ? team.coach_code : null}};
+        case 'set_team': if (!coach) throw new Error(ERR.coach_only); if (a.p_name) team.name = a.p_name; if (a.p_sport) team.sport = a.p_sport; return null;
+        case 'add_category': if (!coach) throw new Error(ERR.coach_only); ensureCat(a.p_name); return null;
+        case 'delete_category': if (!coach) throw new Error(ERR.coach_only); team.categories = team.categories.filter(c => c.toLowerCase() !== a.p_name.toLowerCase()); return null;
+        case 'set_post_category': { const p = find(a.p_post_id); if (p.by !== me && !coach) throw new Error(ERR.not_allowed); p.category = ensureCat(a.p_category); return null; }
+        case 'list_posts': return posts.slice().sort((x,y) => y.t - x.t).map(p => ({
+          id:p.id, url:p.url, platform:p.platform, title:p.title, thumbnail_url:null, comment:p.comment, category:p.category || null, anonymous:!!p.anonymous,
+          status:p.status, created_at:new Date(p.t).toISOString(), mine:p.by === me,
+          submitter: (!p.anonymous || coach || p.by === me) ? name(p.by) : null,
+          upvotes:p.votes.length, voted:p.votes.includes(me), voters: coach ? p.votes.map(name) : null,
+          done_count:mine(p.id).length, last_done: mine(p.id).length ? new Date(Math.max(...mine(p.id).map(l => l.t))).toISOString() : null,
+          review: p.review ? {stars:p.review.stars, note:(coach || p.review.note_public) ? p.review.note : null,
+            note_public:p.review.note_public, reason:(coach || p.by === me) ? p.review.reason : null} : null }));
+        case 'add_post': {
+          if (!/^https?:\/\/\S+$/i.test(a.p_url)) throw new Error(ERR.invalid_url);
+          const key = urlKey(a.p_url), dup = posts.find(p => urlKey(p.url) === key);
+          if (dup) return {id:dup.id, duplicate:true};
+          const id = 'p' + Math.random().toString(36).slice(2);
+          posts.push({id, url:a.p_url, platform:platformOf(a.p_url), title:a.p_title, comment:a.p_comment, category:ensureCat(a.p_category), anonymous:a.p_anonymous, by:me, status:'new', t:Date.now(), votes:[]});
+          return {id, duplicate:false};
+        }
+        case 'toggle_upvote': {
+          const p = find(a.p_post_id); if (p.by === me) throw new Error(ERR.own_post);
+          p.votes = p.votes.includes(me) ? p.votes.filter(v => v !== me) : [...p.votes, me];
+          if (p.status === 'new' && p.votes.length >= team.threshold) p.status = 'relevant';
+          return {upvotes:p.votes.length};
+        }
+        case 'delete_post': { const p = find(a.p_post_id); if (p.by !== me && !coach) throw new Error(ERR.not_allowed); posts = posts.filter(x => x !== p); logs = logs.filter(l => l.post_id !== p.id); return null; }
+        case 'review_post': { if (!coach) throw new Error(ERR.coach_only); const p = find(a.p_post_id); p.status = a.p_status;
+          p.review = {stars:a.p_stars, note:a.p_note, note_public:a.p_note_public, reason:a.p_reason}; return null; }
+        case 'rate_post': { if (!coach) throw new Error(ERR.coach_only); const p = find(a.p_post_id); p.review = {...(p.review || {}), stars:a.p_stars}; return null; }
+        case 'log_workout': { find(a.p_post_id); logs.push({post_id:a.p_post_id, by:me, t:Date.now()}); return {count:mine(a.p_post_id).length}; }
+        case 'undo_workout': { const l = mine(a.p_post_id).sort((x,y) => y.t - x.t)[0]; logs = logs.filter(x => x !== l); return null; }
+        case 'list_my_log': return logs.filter(l => l.by === me).sort((x,y) => y.t - x.t).map(l => { const p = posts.find(x => x.id === l.post_id) || {};
+          return {post_id:l.post_id, done_at:new Date(l.t).toISOString(), title:p.title, category:p.category, platform:p.platform}; });
+        case 'set_threshold': { if (!coach) throw new Error(ERR.coach_only); team.threshold = a.p_threshold;
+          posts.forEach(p => { if (p.status === 'new' && p.votes.length >= team.threshold) p.status = 'relevant'; }); return null; }
+        case 'leave_team': return null;
+      }
+    }
+  };
+  return api;
+}
+function platformOf(u){
+  return /tiktok\.com/i.test(u) ? 'tiktok' : /instagram\.com/i.test(u) ? 'instagram' : /(youtube\.com|youtu\.be)/i.test(u) ? 'youtube'
+    : /(facebook\.com|fb\.watch)/i.test(u) ? 'facebook' : 'web';
+}
+function urlKey(u){
+  const yt = u.match(/youtu\.be\/([\w-]{6,})|[?&]v=([\w-]{6,})|\/shorts\/([\w-]{6,})/);
+  if (yt) return 'youtube:' + (yt[1] || yt[2] || yt[3]);
+  return u.split('#')[0].split('?')[0].toLowerCase().replace(/^https?:\/\/(www\.|m\.)?/, '').replace(/\/+$/, '');
+}
+const firstUrl = s => (String(s || '').match(/https?:\/\/[^\s"'<>]+/) || [])[0] || '';
+
+// Best-effort preview (title + thumbnail). Fails silently.
+async function preview(u){
+  const ctl = new AbortController(); setTimeout(() => ctl.abort(), 4000);
+  try {
+    const p = platformOf(u);
+    const ep = p === 'tiktok' ? 'https://www.tiktok.com/oembed?url=' : (p === 'youtube' || p === 'web') ? 'https://noembed.com/embed?url=' : null;
+    if (!ep) return {};
+    const j = await (await fetch(ep + encodeURIComponent(u), {signal:ctl.signal})).json();
+    return {title:j.title || '', thumb:j.thumbnail_url || ''};
+  } catch { return {}; }
+}
+
+// ---------- state ----------
+let api = remote, demo = null, S = {me:null, posts:[], tab:'pool', open:null, cat:''};
+const SPORTS = ['Kraftsport','Fitness','Laufen','Yoga','Fußball','Handball','Basketball','Volleyball','Hockey','Eishockey','Tennis','Tischtennis','Badminton','Leichtathletik','Schwimmen','Turnen','Kampfsport','Radsport','Rugby','American Football'];
+
+// Category picker: existing team categories as chips, plus "+ Neu" to type one (it joins the team list on save).
+function catPicker(id, cats, current){
+  return `<div class="picks" id="${id}" data-val="${esc(current || '')}">
+    ${cats.map(c => `<button type="button" class="pick" data-c="${esc(c)}" aria-pressed="${c === current}">${esc(c)}</button>`).join('')}
+    <button type="button" class="pick new" data-new>+ Neu</button></div>
+    <input type="text" id="${id}New" maxlength="30" placeholder="Neue Kategorie, z. B. Abwehr" hidden style="margin-top:8px">`;
+}
+function bindCatPicker(id){
+  const box = $('#' + id), inp = $('#' + id + 'New');
+  box.querySelectorAll('[data-c]').forEach(b => b.onclick = () => {
+    const on = b.getAttribute('aria-pressed') !== 'true';
+    box.querySelectorAll('[data-c]').forEach(x => x.setAttribute('aria-pressed', 'false'));
+    b.setAttribute('aria-pressed', on); box.dataset.val = on ? b.dataset.c : ''; inp.hidden = true; inp.value = ''; });
+  box.querySelector('[data-new]').onclick = () => {
+    box.querySelectorAll('[data-c]').forEach(x => x.setAttribute('aria-pressed', 'false')); box.dataset.val = '';
+    inp.hidden = false; inp.focus(); };
+  return () => (inp.hidden ? box.dataset.val : inp.value).trim();
+}
+function sportPicker(current, id = 'sp'){
+  const known = !current || SPORTS.includes(current);
+  return `<select id="${id}">${SPORTS.map(s => `<option ${s === current ? 'selected' : ''}>${esc(s)}</option>`).join('')}
+      <option value="__other" ${known ? '' : 'selected'}>Andere Sportart …</option></select>
+    <input id="${id}Other" type="text" maxlength="40" placeholder="Sportart eingeben" value="${known ? '' : esc(current)}" ${known ? 'hidden' : ''} style="margin-top:8px">`;
+}
+function bindSportPicker(id = 'sp'){
+  const sel = $('#' + id), o = $('#' + id + 'Other');
+  sel.onchange = () => { o.hidden = sel.value !== '__other'; if (!o.hidden) o.focus(); };
+  return () => sel.value === '__other' ? o.value.trim() : sel.value;
+}
+const toast = t => { const el = $('#toast'); el.textContent = t; el.classList.add('on'); clearTimeout(toast.h); toast.h = setTimeout(() => el.classList.remove('on'), 2600); };
+const token = () => demo ? 'demo' : store.get('token');
+
+async function load(){
+  try {
+    S.me = await api.call('whoami', {p_token:token()});
+    S.posts = await api.call('list_posts', {p_token:token()});
+    if (S.tab === 'stats') S.log = await api.call('list_my_log', {p_token:token()});
+    render();
+  } catch (e) {
+    if (!demo && /neu beitreten/.test(e.message)) { store.del('token'); S.me = null; render(); }
+    else toast(e.message);
+  }
+}
+
+// ---------- views ----------
+const isSolo = () => S.me && S.me.team.mode === 'solo';
+const SOLO_STATUS = {new:'Neu', seen:'Okay', adopted:'Favorit', rejected:'Nicht meins', relevant:'Neu'};
+const fmtDay = iso => new Date(iso).toLocaleDateString('de-DE', {day:'2-digit', month:'2-digit'});
+const SORTS = {new:'Neueste', stars:'Beste Bewertung', done:'Am häufigsten gemacht', stale:'Am längsten nicht gemacht'};
+
+function sortList(list){
+  const s = S.sort || 'new', t = p => p.last_done ? Date.parse(p.last_done) : 0;
+  const by = {new:(a,b) => Date.parse(b.created_at) - Date.parse(a.created_at),
+    stars:(a,b) => ((b.review && b.review.stars) || 0) - ((a.review && a.review.stars) || 0),
+    done:(a,b) => (b.done_count || 0) - (a.done_count || 0), stale:(a,b) => t(a) - t(b)}[s];
+  return list.slice().sort(by);
+}
+
+function render(){
+  const app = $('#app');
+  if (!S.me) { app.innerHTML = onboarding(); bindOnboarding(); return; }
+  const coach = S.me.role === 'coach', solo = isSolo();
+  const relevantOpen = S.posts.filter(p => p.status === 'relevant').length;
+  const tabs = solo
+    ? [['all','Sammlung'], ['fav','Favoriten'], ['stats','Statistik'], ['team','Einstellungen']]
+    : [['pool','Pool'], ...(coach ? [['coach','Coach', relevantOpen]] : []), ['training','Training'], ['mine','Meine'], ['stats','Statistik'], ['team','Team']];
+  if (!tabs.some(t => t[0] === S.tab)) S.tab = tabs[0][0];
+  let list = S.posts, hint = '';
+  if (S.tab === 'all') { list = S.posts.filter(p => p.status !== 'rejected'); hint = 'Deine Übungen. Bewerte sie mit Sternen und tippe nach dem Training auf „Gemacht“.'; }
+  if (S.tab === 'fav') { list = S.posts.filter(p => p.status === 'adopted'); hint = 'Was du als Favorit markiert hast.'; }
+  if (S.tab === 'pool') { list = S.posts.filter(p => p.status !== 'adopted' && p.status !== 'rejected');
+    hint = `Upvote, was ihr trainieren wollt. Ab ${S.me.team.threshold} Upvotes landet es beim Coach.`; }
+  if (S.tab === 'coach') { list = ['relevant','new','seen','rejected'].flatMap(s => S.posts.filter(p => p.status === s));
+    hint = 'Oben: hat die Schwelle erreicht. Darunter: neu, angeschaut, abgelehnt.'; }
+  if (S.tab === 'training') { list = S.posts.filter(p => p.status === 'adopted'); hint = 'Vom Coach ins Training aufgenommen. Tippe auf „Gemacht“, wenn du es trainiert hast.'; }
+  if (S.tab === 'mine') { list = S.posts.filter(p => p.mine); hint = 'Deine geteilten Links und was der Coach dazu sagt.'; }
+  if (solo && S.tab !== 'stats' && S.tab !== 'team') list = sortList(list);
+  const usedCats = [...new Set(list.map(p => p.category).filter(Boolean))];
+  if (S.cat && !usedCats.includes(S.cat)) S.cat = '';
+  if (S.cat) list = list.filter(p => p.category === S.cat);
+  const filters = usedCats.length > 1 ? `<div class="filters" role="group" aria-label="Kategorie">
+      <button class="pick" data-f="" aria-pressed="${!S.cat}">Alle</button>
+      ${usedCats.map(c => `<button class="pick" data-f="${esc(c)}" aria-pressed="${S.cat === c}">${esc(c)}</button>`).join('')}</div>` : '';
+  const sorter = solo ? `<div class="row" style="margin:0 0 12px"><label for="sort" class="small" style="margin:0;color:var(--chalk)">Sortieren</label>
+      <select id="sort" style="width:auto;flex:1">${Object.entries(SORTS).map(([k,l]) => `<option value="${k}" ${k === (S.sort || 'new') ? 'selected' : ''}>${l}</option>`).join('')}</select></div>` : '';
+  const body = S.tab === 'team' ? teamView(coach) : S.tab === 'stats' ? statsView()
+    : `<p class="hint">${esc(hint)}</p>${filters}${sorter}${list.length ? list.map(postCard).join('') : emptyView()}`;
+  app.innerHTML = `
+    <header class="top"><h1>Hear Me Coach</h1>
+      <div class="team">${esc(S.me.team.name)} · ${esc(S.me.team.sport)}<br>${esc(S.me.name)}${solo ? '' : ' · ' + (coach ? 'Coach' : 'Spieler')}</div></header>
+    <nav class="tabs" role="tablist">${tabs.map(([k,l,n]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${S.tab===k}">${l}${n ? `<span class="n">${n}</span>` : ''}</button>`).join('')}</nav>
+    <main>${body}</main>
+    <button class="fab" id="fab">${solo ? '+ Video speichern' : '+ Link teilen'}</button>`;
+  app.querySelectorAll('[data-tab]').forEach(b => b.onclick = async () => { S.tab = b.dataset.tab; S.cat = '';
+    if (S.tab === 'stats') { try { S.log = await api.call('list_my_log', {p_token:token()}); } catch (e) { toast(e.message); } }
+    render(); scrollTo(0,0); });
+  app.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { S.cat = b.dataset.f; render(); });
+  const so = $('#sort'); if (so) so.onchange = () => { S.sort = so.value; render(); };
+  $('#fab').onclick = () => openShare('');
+  bindPosts(); if (S.tab === 'team') bindTeam();
+}
+
+function emptyView(){
+  const t = {pool:['Noch leer','Teile das erste Video aus TikTok oder Instagram.'], coach:['Alles gesichtet','Sobald etwas die Schwelle erreicht, taucht es hier auf.'],
+    training:['Noch nichts aufgenommen','Der Coach entscheidet, was ins Training kommt.'], mine:['Du hast noch nichts geteilt','Tippe auf „+ Link teilen“.'],
+    all:['Deine Sammlung ist leer','Speichere das erste Video aus TikTok oder Instagram.'], fav:['Noch keine Favoriten','Öffne „Bearbeiten“ bei einer Übung und markiere sie als Favorit.']}[S.tab];
+  return `<div class="empty"><h2>${t[0]}</h2><p>${t[1]}</p></div>`;
+}
+
+function postCard(p){
+  const coach = S.me.role === 'coach', solo = isSolo(), th = S.me.team.threshold, pct = Math.min(100, p.upvotes / th * 100);
+  const who = p.submitter ? (p.anonymous ? `${esc(p.submitter)} (anonym geteilt)` : esc(p.submitter)) : 'Anonym';
+  const r = p.review || {};
+  const stars = solo ? `<div class="stars mini" role="group" aria-label="Bewertung">${[1,2,3,4,5].map(i =>
+      `<button type="button" data-rate="${esc(p.id)}" data-s="${i}" class="${i <= (r.stars || 0) ? 'on' : ''}" aria-label="${i} Sterne">★</button>`).join('')}</div>` : '';
+  const feedback = !solo && (r.note || r.reason || r.stars) ? `<div class="review small">
+      ${r.stars ? `<b>Coach:</b> ${'★'.repeat(r.stars)}${'☆'.repeat(5 - r.stars)} ` : ''}
+      ${r.note ? `<div>${esc(r.note)}${coach && !r.note_public ? ' <i>(privat)</i>' : ''}</div>` : ''}
+      ${r.reason ? `<div><b>Grund:</b> ${esc(r.reason)}</div>` : ''}</div>` : (solo && r.note ? `<div class="review small">${esc(r.note)}</div>` : '');
+  const canLog = solo || p.status === 'adopted';
+  const done = canLog ? `<div class="row" style="margin-top:8px">
+      <button class="btn ${p.done_count ? '' : 'acc'}" data-log="${esc(p.id)}">✓ Gemacht${p.done_count ? ` · ${p.done_count}×` : ''}</button>
+      ${p.done_count ? `<button class="btn alt" data-undo="${esc(p.id)}" aria-label="Letzten Eintrag zurücknehmen">↶</button>
+        <span class="small">zuletzt ${fmtDay(p.last_done)}</span>` : ''}</div>` : '';
+  const vote = solo ? '' : `<div class="vote">
+        <button class="up" data-up="${esc(p.id)}" aria-pressed="${p.voted}" ${p.mine ? 'disabled title="Eigener Beitrag"' : ''}>▲ ${p.upvotes}</button>
+        ${p.status === 'new' ? `<div class="meter" aria-hidden="true"><i style="width:${pct}%"></i></div><span class="mlab">${p.upvotes}/${th}</span>`
+          : `<a class="link small" href="${esc(p.url)}" target="_blank" rel="noopener">In ${esc(PL[p.platform] || 'Browser')} öffnen</a>`}
+      </div>${coach && p.voters && p.voters.length ? `<div class="small" style="margin-top:6px">Upvotes von: ${p.voters.map(esc).join(', ')}</div>` : ''}`;
+  return `<article class="card post">
+    <a class="thumb p-${esc(p.platform)}" href="${esc(p.url)}" target="_blank" rel="noopener" aria-label="Video öffnen">
+      ${p.thumbnail_url ? `<img src="${esc(p.thumbnail_url)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '▶'}
+      <span class="pl">${esc(PL[p.platform] || 'Link')}</span></a>
+    <div>
+      <div class="meta">${solo ? '' : `<span>${who}</span>`}<span>${fmtDay(p.created_at)}</span>
+        <span class="chip s-${esc(p.status)}">${esc((solo ? SOLO_STATUS : STATUS)[p.status])}</span></div>
+      ${p.category ? `<div style="margin-top:4px"><span class="cat">${esc(p.category)}</span></div>` : ''}
+      <div class="title">${esc(p.title || PL[p.platform] + '-Video')}</div>
+      ${p.comment ? `<div class="comment">„${esc(p.comment)}“</div>` : ''}
+      ${stars}${vote}${feedback}${done}
+      <div class="row" style="margin-top:10px">
+        ${coach ? `<button class="btn alt" data-rev="${esc(p.id)}">${solo ? 'Bearbeiten' : 'Bewerten'}</button>` : ''}
+        ${p.mine || coach ? `<button class="btn alt" data-del="${esc(p.id)}">Löschen</button>` : ''}
+      </div>
+    </div></article>`;
+}
+
+function bindPosts(){
+  const run = async (fn, args, msg) => { try { await api.call(fn, {p_token:token(), ...args}); if (msg) toast(msg); await load(); } catch (e) { toast(e.message); } };
+  document.querySelectorAll('[data-up]').forEach(b => b.onclick = () => run('toggle_upvote', {p_post_id:b.dataset.up}));
+  document.querySelectorAll('[data-rate]').forEach(b => b.onclick = () => run('rate_post', {p_post_id:b.dataset.rate, p_stars:+b.dataset.s}));
+  document.querySelectorAll('[data-log]').forEach(b => b.onclick = () => run('log_workout', {p_post_id:b.dataset.log, p_note:null}, 'Eingetragen. Stark!'));
+  document.querySelectorAll('[data-undo]').forEach(b => b.onclick = () => run('undo_workout', {p_post_id:b.dataset.undo}, 'Letzter Eintrag entfernt'));
+  document.querySelectorAll('[data-del]').forEach(b => b.onclick = () => confirmSheet('Beitrag löschen?',
+    isSolo() ? 'Das Video und deine Einträge dazu werden gelöscht.' : 'Er verschwindet für alle. Das lässt sich nicht rückgängig machen.', 'Löschen', async () => {
+    await api.call('delete_post', {p_token:token(), p_post_id:b.dataset.del}); toast('Gelöscht'); await load(); }));
+  document.querySelectorAll('[data-rev]').forEach(b => b.onclick = () => openReview(S.posts.find(p => p.id === b.dataset.rev)));
+}
+
+// ---------- statistics (computed from my own log) ----------
+function weekStart(t){ const d = new Date(t); d.setHours(0,0,0,0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.getTime(); }
+function statsView(){
+  const log = S.log || [];
+  if (!log.length) return `<div class="empty"><h2>Noch keine Einträge</h2><p>Tippe nach dem Training bei einer Übung auf „✓ Gemacht“. Hier siehst du dann, wie oft und was du trainiert hast.</p></div>`;
+  const now = Date.now(), W = 7*864e5, thisWeek = weekStart(now);
+  const weeks = Array.from({length:12}, (_, i) => weekStart(thisWeek - (11 - i) * W + 432e5)); // +12h keeps DST shifts inside the right week
+  const perWeek = weeks.map(w => log.filter(l => weekStart(Date.parse(l.done_at)) === w).length);
+  const days = new Set(log.map(l => new Date(l.done_at).toDateString()));
+  const daysThisWeek = new Set(log.filter(l => Date.parse(l.done_at) >= thisWeek).map(l => new Date(l.done_at).toDateString())).size;
+  let streak = 0; for (let i = perWeek.length - 1; i >= 0; i--) { if (perWeek[i]) streak++; else if (i === perWeek.length - 1) continue; else break; }
+  const count = key => Object.entries(log.reduce((m, l) => { const k = l[key] || 'Ohne Kategorie'; m[k] = (m[k] || 0) + 1; return m; }, {})).sort((a,b) => b[1] - a[1]);
+  const byCat = count('category');
+  const byPost = Object.values(log.reduce((m, l) => { (m[l.post_id] = m[l.post_id] || {title:l.title || 'Video', n:0, last:l.done_at}).n++; return m; }, {})).sort((a,b) => b.n - a.n).slice(0, 5);
+  const max = Math.max(1, ...perWeek), maxC = Math.max(1, ...byCat.map(c => c[1]));
+  const lastDays = [...days].map(d => Date.parse(d)).sort((a,b) => b - a);
+  const stale = S.posts.filter(p => p.status !== 'rejected' && p.done_count && Date.parse(p.last_done) < now - 14*864e5);
+  return `<section class="card"><h2 style="font-size:26px">Dein Training</h2>
+      <div class="kpis">
+        <div><b>${days.size}</b><span>Trainingstage</span></div>
+        <div><b>${log.length}</b><span>Übungen gemacht</span></div>
+        <div><b>${daysThisWeek}</b><span>Tage diese Woche</span></div>
+        <div><b>${streak}</b><span>Wochen in Folge</span></div></div>
+      <p class="small">Letztes Training: ${lastDays.length ? new Date(lastDays[0]).toLocaleDateString('de-DE', {weekday:'long', day:'2-digit', month:'2-digit'}) : '–'}</p></section>
+    <section class="card"><h3 style="font-size:22px">Übungen pro Woche</h3>
+      <div class="weeks" role="img" aria-label="Übungen pro Woche, letzte 12 Wochen">
+        ${perWeek.map((n, i) => `<div class="wk"><span class="wn">${n || ''}</span><i style="height:${n / max * 100}%"></i>
+          <span class="wl">${i === 11 ? 'jetzt' : 'KW' + kw(weeks[i])}</span></div>`).join('')}</div></section>
+    <section class="card"><h3 style="font-size:22px">Nach Kategorie</h3>
+      ${byCat.map(([c, n]) => `<div class="bar"><span>${esc(c)}</span><div><i style="width:${n / maxC * 100}%"></i></div><b>${n}</b></div>`).join('')}</section>
+    <section class="card"><h3 style="font-size:22px">Am häufigsten</h3>
+      <ol class="top5">${byPost.map(p => `<li><span>${esc(p.title)}</span><b>${p.n}×</b></li>`).join('')}</ol>
+      ${stale.length ? `<p class="small"><b>Länger nicht gemacht:</b> ${stale.slice(0, 4).map(p => esc(p.title || 'Video')).join(', ')}</p>` : ''}</section>`;
+}
+function kw(t){ const d = new Date(t); d.setDate(d.getDate() + 3 - ((d.getDay() + 6) % 7)); const y = new Date(d.getFullYear(), 0, 4);
+  return 1 + Math.round(((d - y) / 864e5 - 3 + ((y.getDay() + 6) % 7)) / 7); }
+
+function teamView(coach){
+  const t = S.me.team, solo = t.mode === 'solo';
+  const invite = solo ? '' : `<section class="card"><h2 style="font-size:26px">Mitspieler einladen</h2>
+      <p>Spieler-Code:</p><div class="code">${esc(t.player_code)}</div>
+      <div class="row" style="margin-top:8px"><button class="btn" id="copyInvite">Einladung kopieren</button></div>
+      <p class="small">Schick die Einladung in eure WhatsApp-Gruppe. Wer beitritt, gibt den Code und seinen Namen ein.</p></section>`;
+  const coachBox = !coach ? '' : `<section class="card"><h2 style="font-size:26px">${solo ? 'Sammlung' : 'Coach-Einstellungen'}</h2>
+      ${solo ? '' : `<p class="small">Co-Trainer-Code (nur an Trainer geben):</p><div class="code">${esc(t.coach_code)}</div>
+      <label for="th">Upvotes bis zum Coach</label>
+      <div class="row"><input id="th" type="number" min="1" max="100" value="${t.threshold}" style="max-width:120px"><button class="btn" id="saveTh">Speichern</button></div>`}
+      <label for="tn2">${solo ? 'Name der Sammlung' : 'Mannschaft'}</label><input id="tn2" type="text" maxlength="80" value="${esc(t.name)}">
+      <label for="sp">Sportart</label>${sportPicker(t.sport)}
+      <div class="row" style="margin-top:10px"><button class="btn" id="saveTeam">Speichern</button></div></section>
+    <section class="card"><h2 style="font-size:26px">Kategorien</h2>
+      <p class="small">Neue Kategorien, die beim Speichern eines Videos eingegeben werden, kommen automatisch dazu. Entfernen ändert keine bestehenden Beiträge.</p>
+      <div class="catlist">${t.categories.map(c => `<span>${esc(c)}<button data-delcat="${esc(c)}" aria-label="${esc(c)} entfernen">×</button></span>`).join('')}</div>
+      <div class="row"><input id="newCat" type="text" maxlength="30" placeholder="${solo ? 'z. B. Waden' : 'z. B. Abwehr'}" style="flex:1"><button class="btn" id="addCat">Hinzufügen</button></div></section>`;
+  return `${invite}${coachBox}
+    <section class="card"><h2 style="font-size:26px">So speicherst du ein Video</h2>
+      <p><b>Android:</b> Diese Seite über das Browser-Menü „Zum Startbildschirm hinzufügen“ installieren. Danach in TikTok oder Instagram auf <i>Teilen</i> tippen und <b>Hear Me Coach</b> wählen.</p>
+      <p><b>iPhone und alle anderen:</b> Im Video <i>Teilen → Link kopieren</i>, dann hier „${solo ? '+ Video speichern' : '+ Link teilen'}“ und einfügen.</p>
+      ${solo ? '' : '<p class="small">Anonym geteilte Links zeigen Mitspielern keinen Namen. Der Coach sieht immer, wer etwas geteilt hat.</p>'}</section>
+    <section class="card"><button class="btn alt" id="leave">${solo ? 'Sammlung löschen' : 'Mannschaft verlassen'}</button>
+      <p class="small">${solo ? 'Löscht dein Profil, deine Videos und deine Statistik.' : 'Löscht dein Profil und deine geteilten Links.'}</p></section>`;
+}
+function bindTeam(){
+  const ci = $('#copyInvite'); if (ci) ci.onclick = async () => {
+    const txt = `Komm in unseren Trainings-Pool bei Hear Me Coach: ${location.href.split('?')[0].split('#')[0]} – Code: ${S.me.team.player_code}`;
+    try { await navigator.clipboard.writeText(txt); toast('Einladung kopiert'); } catch { toast('Kopieren nicht möglich: ' + txt); } };
+  const sv = $('#saveTh'); if (sv) sv.onclick = async () => {
+    const n = parseInt($('#th').value, 10); if (!(n >= 1 && n <= 100)) return toast('Zahl zwischen 1 und 100');
+    try { await api.call('set_threshold', {p_token:token(), p_threshold:n}); toast('Gespeichert'); await load(); } catch (e) { toast(e.message); } };
+  if (S.me.role === 'coach') {
+    const sport = bindSportPicker();
+    $('#saveTeam').onclick = async () => {
+      try { await api.call('set_team', {p_token:token(), p_name:$('#tn2').value, p_sport:sport()}); toast('Gespeichert'); await load(); } catch (e) { toast(e.message); } };
+    $('#addCat').onclick = async () => { const n = $('#newCat').value.trim(); if (!n) return;
+      try { await api.call('add_category', {p_token:token(), p_name:n}); await load(); } catch (e) { toast(e.message); } };
+    document.querySelectorAll('[data-delcat]').forEach(b => b.onclick = async () => {
+      try { await api.call('delete_category', {p_token:token(), p_name:b.dataset.delcat}); await load(); } catch (e) { toast(e.message); } });
+  }
+  $('#leave').onclick = () => confirmSheet('Mannschaft verlassen?', 'Dein Profil und alle deine geteilten Links werden gelöscht.', 'Verlassen', async () => {
+    if (!demo) await api.call('leave_team', {p_token:token()}); store.del('token'); S.me = null; render(); });
+}
+
+// ---------- sheets ----------
+function sheet(html){ $('#sheetBody').innerHTML = html; $('#sheet').classList.add('open'); }
+function closeSheet(){ $('#sheet').classList.remove('open'); }
+$('#sheet').addEventListener('click', e => { if (e.target.id === 'sheet' || e.target.dataset.close != null) closeSheet(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet(); });
+
+function confirmSheet(title, text, label, fn){
+  sheet(`<h2>${esc(title)}</h2><p>${esc(text)}</p><div class="row"><button class="btn acc" id="ok">${esc(label)}</button><button class="btn alt" data-close>Abbrechen</button></div>`);
+  $('#ok').onclick = async () => { try { await fn(); closeSheet(); } catch (e) { toast(e.message); } };
+}
+
+function openShare(prefill){
+  const solo = isSolo();
+  sheet(`<h2>${solo ? 'Video speichern' : 'Hear me, Coach!'}</h2>
+    <form id="shareForm">
+      <label for="u">Link zum Video</label>
+      <input id="u" type="url" inputmode="url" placeholder="https://www.tiktok.com/…" value="${esc(prefill)}" required>
+      <p class="small" id="pv"></p>
+      <label for="ti">Titel <span class="small">(was ist zu sehen?)</span></label>
+      <input id="ti" type="text" maxlength="200" placeholder="${solo ? 'z. B. Kniebeuge mit Pause' : 'z. B. Passübung im Dreieck'}">
+      <label>Kategorie</label>${catPicker('cp', S.me.team.categories, '')}
+      <label for="co">${solo ? 'Notiz' : 'Warum sollten wir das machen?'} <span class="small">(optional)</span></label>
+      <textarea id="co" maxlength="500" placeholder="${solo ? 'z. B. 3 × 10, langsam runter' : ''}"></textarea>
+      ${solo ? '' : `<label class="switch"><input id="an" type="checkbox"> Anonym teilen</label>
+      <p class="small">Mitspieler sehen dann keinen Namen. Der Coach sieht immer, von wem es kommt.</p>`}
+      <div class="row" style="margin-top:14px"><button class="btn acc" type="submit">${solo ? 'Speichern' : 'In den Pool'}</button><button class="btn alt" type="button" data-close>Abbrechen</button></div>
+    </form>`);
+  let pv = {}; const cat = bindCatPicker('cp');
+  const check = async () => {
+    const u = firstUrl($('#u').value); if (!u) return;
+    $('#u').value = u; $('#pv').textContent = PL[platformOf(u)] + '-Link erkannt';
+    pv = await preview(u); if (pv.title && !$('#ti').value) $('#ti').value = pv.title.slice(0, 200);
+  };
+  $('#u').addEventListener('change', check); $('#u').addEventListener('paste', () => setTimeout(check, 0));
+  if (prefill) check(); else setTimeout(() => $('#u').focus(), 50);
+  $('#shareForm').onsubmit = async e => {
+    e.preventDefault();
+    const u = firstUrl($('#u').value); if (!u) return toast(ERR.invalid_url);
+    try {
+      const r = await api.call('add_post', {p_token:token(), p_url:u, p_title:$('#ti').value, p_thumbnail_url:pv.thumb || null,
+        p_comment:$('#co').value, p_anonymous: !solo && $('#an').checked, p_category:cat() || null});
+      closeSheet();
+      toast(r.duplicate ? (solo ? 'Das Video ist schon in deiner Sammlung.' : 'Den Link gibt es schon im Pool, gib ihm ein Upvote.')
+        : (solo ? 'Gespeichert.' : 'Im Pool! Jetzt brauchst du Upvotes.'));
+      S.tab = solo ? 'all' : 'pool'; await load();
+    } catch (err) { toast(err.message); }
+  };
+}
+
+function openReview(p){
+  const r = p.review || {}, solo = isSolo(); let stars = r.stars || 0;
+  sheet(`<h2>${esc(p.title || 'Beitrag')}</h2>
+    <p class="small">${solo ? '' : `Geteilt von <b>${esc(p.submitter || '?')}</b>${p.anonymous ? ' (anonym für Mitspieler)' : ''} · ${p.upvotes} Upvotes · `}
+      <a class="link" href="${esc(p.url)}" target="_blank" rel="noopener">Video öffnen</a></p>
+    <label>Kategorie</label>${catPicker('rc', S.me.team.categories, p.category || '')}
+    <label>${solo ? 'Wie gefällt dir die Übung?' : 'Deine Bewertung'}</label><div class="stars" id="st">${[1,2,3,4,5].map(i => `<button type="button" data-s="${i}" aria-label="${i} Sterne">★</button>`).join('')}</div>
+    <label for="no">Notiz</label><textarea id="no" maxlength="2000" placeholder="${solo ? 'z. B. 3 × 10 mit 60 kg' : 'z. B. Dienstag Block 2, mit kleineren Feldern'}">${esc(r.note || '')}</textarea>
+    ${solo ? '' : `<label class="switch"><input id="np" type="checkbox" ${r.note_public ? 'checked' : ''}> Notiz für die Mannschaft sichtbar</label>
+    <label for="rs">Grund bei Ablehnung <span class="small">(sieht nur der Absender)</span></label>
+    <input id="rs" type="text" maxlength="300" value="${esc(r.reason || '')}">`}
+    <div class="row" style="margin-top:16px">
+      <button class="btn acc" data-st="adopted">${solo ? '♥ Favorit' : 'Ins Training'}</button>
+      <button class="btn" data-st="seen">${solo ? 'Okay' : 'Angeschaut'}</button>
+      <button class="btn alt" data-st="rejected">${solo ? 'Nicht meins' : 'Ablehnen'}</button></div>`);
+  const cat = bindCatPicker('rc');
+  const paint = () => document.querySelectorAll('#st [data-s]').forEach(b => b.classList.toggle('on', +b.dataset.s <= stars));
+  document.querySelectorAll('#st [data-s]').forEach(b => b.onclick = () => { stars = +b.dataset.s; paint(); }); paint();
+  document.querySelectorAll('[data-st]').forEach(b => b.onclick = async () => {
+    try {
+      await api.call('review_post', {p_token:token(), p_post_id:p.id, p_status:b.dataset.st, p_stars:stars || null,
+        p_note:$('#no').value, p_note_public: solo ? false : $('#np').checked, p_reason: solo ? null : $('#rs').value});
+      if ((cat() || '') !== (p.category || '') && cat()) await api.call('set_post_category', {p_token:token(), p_post_id:p.id, p_category:cat()});
+      closeSheet(); toast('Gespeichert'); await load();
+    } catch (e) { toast(e.message); } });
+}
+
+// ---------- onboarding ----------
+function onboarding(){
+  return `<main><section class="hero">
+      <h1>Hear Me Coach</h1>
+      <p>Ihr findet starke Übungen auf TikTok und Instagram. Teilt sie hier, stimmt ab, und was die Mannschaft feiert, landet beim Coach. Oder sammle Übungen nur für dich und behalte im Blick, was du trainiert hast.</p>
+      <svg class="board" viewBox="0 0 640 150" role="img" aria-label="Ablauf: teilen, upvoten, Coach, Training">
+        <g fill="none" stroke="#f3f7f1" stroke-width="3" stroke-linecap="round" opacity=".9">
+          <rect x="4" y="4" width="632" height="142" rx="10" stroke-dasharray="2 10"/><line x1="320" y1="8" x2="320" y2="142" opacity=".35"/>
+          <circle cx="320" cy="75" r="34" opacity=".35"/>
+          <path d="M120 75 C 170 40, 200 40, 240 70" marker-end="url(#ar)"/><path d="M290 75 C 340 110, 380 110, 420 80" marker-end="url(#ar)"/>
+          <path d="M470 75 C 500 40, 520 40, 548 66" marker-end="url(#ar)"/></g>
+        <defs><marker id="ar" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="#f3f7f1"/></marker></defs>
+        <g font-family="Barlow Condensed" font-weight="700" font-size="22" text-anchor="middle">
+          <circle cx="80" cy="75" r="30" fill="#ff5a3c"/><text x="80" y="82" fill="#fff">▶</text><text x="80" y="132" fill="#f3f7f1">Teilen</text>
+          <circle cx="265" cy="75" r="26" fill="#f3f7f1"/><text x="265" y="83" fill="#0b4d33">▲</text><text x="265" y="132" fill="#f3f7f1">Upvoten</text>
+          <circle cx="445" cy="75" r="26" fill="#f3f7f1"/><text x="445" y="83" fill="#0b4d33">C</text><text x="445" y="132" fill="#f3f7f1">Coach</text>
+          <circle cx="585" cy="75" r="30" fill="#ff5a3c"/><text x="585" y="83" fill="#fff">✓</text><text x="585" y="132" fill="#f3f7f1">Training</text></g>
+      </svg></section>
+    <section class="card"><h2 style="font-size:26px">Mannschaft beitreten</h2>
+      <form id="joinForm"><label for="jc">Code vom Coach</label><input id="jc" type="text" autocapitalize="characters" autocomplete="off" required maxlength="12">
+        <label for="jn">Dein Name</label><input id="jn" type="text" maxlength="40" required autocomplete="given-name">
+        <div class="row" style="margin-top:14px"><button class="btn acc">Beitreten</button></div></form></section>
+    <section class="card"><h2 style="font-size:26px">Ich bin Coach</h2>
+      <form id="createForm"><label for="tn">Mannschaft</label><input id="tn" type="text" maxlength="80" required placeholder="z. B. Damen 1 TV Musterstadt">
+        <label for="sp">Sportart</label>${sportPicker('Fußball')}
+        <label for="cn">Dein Name</label><input id="cn" type="text" maxlength="40" required>
+        <div class="row" style="margin-top:14px"><button class="btn">Mannschaft anlegen</button></div></form>
+    </section>
+    <section class="card"><h2 style="font-size:26px">Ich trainiere allein</h2>
+      <p class="small">Deine eigene Sammlung ohne Coach: Videos speichern, nach Muskelgruppe ordnen, bewerten und abhaken, wenn du sie gemacht hast. Mit Statistik.</p>
+      <form id="soloForm"><label for="sn">Dein Name</label><input id="sn" type="text" maxlength="40" required>
+        <label for="ssp">Sportart</label>${sportPicker('Kraftsport', 'ssp')}
+        <div class="row" style="margin-top:14px"><button class="btn">Sammlung starten</button></div></form></section>
+    <p class="small" style="color:var(--chalk)">Beta: Es gibt kein Passwort. Der Zugang ist in diesem Browser gespeichert.</p></main>`;
+}
+function bindOnboarding(){
+  const done = r => { store.set('token', r.token); S.tab = r.team.mode === 'solo' ? 'all' : r.role === 'coach' ? 'coach' : 'pool'; load().then(handleShare); };
+  $('#joinForm').onsubmit = async e => { e.preventDefault();
+    try { done(await api.call('join_team', {p_code:$('#jc').value, p_name:$('#jn').value})); } catch (err) { toast(err.message); } };
+  const sport = bindSportPicker();
+  $('#createForm').onsubmit = async e => { e.preventDefault();
+    if (!sport()) return toast('Bitte eine Sportart eingeben.');
+    try { done(await api.call('create_team', {p_team_name:$('#tn').value, p_coach_name:$('#cn').value, p_sport:sport(), p_mode:'team'})); } catch (err) { toast(err.message); } };
+  const ssport = bindSportPicker('ssp');
+  $('#soloForm').onsubmit = async e => { e.preventDefault();
+    if (!ssport()) return toast('Bitte eine Sportart eingeben.');
+    try { done(await api.call('create_team', {p_team_name:'Mein Training', p_coach_name:$('#sn').value, p_sport:ssport(), p_mode:'solo'})); } catch (err) { toast(err.message); } };
+  const code = new URLSearchParams(location.search).get('code'); if (code) $('#jc').value = code;
+}
+
+// ---------- share target ----------
+let pendingShare = '';
+function handleShare(){
+  if (pendingShare && S.me) { const u = pendingShare; pendingShare = ''; openShare(u); }
+}
+
+// ---------- start ----------
+async function start(){
+  const q = new URLSearchParams(location.search);
+  pendingShare = firstUrl([q.get('url'), q.get('text'), q.get('title')].join(' '));
+  if (pendingShare) history.replaceState(null, '', location.pathname);
+  let reachable = !q.has('demo');
+  if (reachable) { try { await fetch(CFG.url + '/rest/v1/', {headers:{apikey:CFG.key}, method:'HEAD'}); } catch { reachable = false; } }
+  if (!reachable) {
+    const demos = {team: makeDemo('team'), solo: makeDemo('solo')};
+    demo = demos.team; api = demo;
+    const bar = $('#demo'); bar.hidden = false;
+    bar.innerHTML = `<b>Demo</b> mit Beispieldaten. Ansicht als: <select id="who">
+      <optgroup label="Mannschaft (Volleyball)">${demos.team.members.map(m => `<option value="team:${m.id}">${esc(m.name)}${m.role === 'coach' ? ' (Coach)' : ''}</option>`).join('')}</optgroup>
+      <optgroup label="Allein trainieren"><option value="solo:s">Jan (Kraftsport, solo)</option></optgroup></select>`;
+    $('#who').onchange = async e => { const [k, id] = e.target.value.split(':'); demo = demos[k]; api = demo; demo.setMe(id);
+      S.tab = k === 'solo' ? 'all' : id === 'c' ? 'coach' : 'pool'; S.cat = ''; S.log = null; await load(); };
+    S.tab = 'coach'; await load(); return;
+  }
+  if (store.get('token')) { await load(); handleShare(); } else render();
+  setInterval(() => { if (S.me && !document.hidden && !$('#sheet').classList.contains('open')) load(); }, 20000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && S.me) load(); });
+  if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+start();
+}
+</script>
+</body>
+</html>
