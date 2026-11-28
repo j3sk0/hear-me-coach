@@ -1,0 +1,48 @@
+# Builds the native app in the Expo cloud (EAS). Start it manually under Actions -> "App bauen".
+# Needs the repository secret EXPO_TOKEN (expo.dev -> Account settings -> Access tokens).
+name: App bauen
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: "Plattform"
+        type: choice
+        options: [android, ios, all]
+        default: android
+      profile:
+        description: "preview = APK zum direkten Installieren (Android), production = für Play Store / TestFlight"
+        type: choice
+        options: [preview, production]
+        default: preview
+      submit:
+        description: "Nach dem Build automatisch an Play Store (interner Test) / TestFlight senden"
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - run: npm ci
+      - run: npx tsc --noEmit
+      - name: Expo-Projekt prüfen
+        run: |
+          node -e "const id=require('./app.json').expo.extra?.eas?.projectId; if(!id){console.error('Noch keine Expo-Projekt-ID in mobile/app.json (expo.extra.eas.projectId). Siehe ANLEITUNG-APP.md, Schritt 2.');process.exit(1)}"
+      - name: Build
+        run: >
+          eas build --platform ${{ inputs.platform }} --profile ${{ inputs.profile }} --non-interactive --no-wait
+          ${{ inputs.submit && inputs.profile == 'production' && '--auto-submit' || '' }}

@@ -1,33 +1,78 @@
-# Hear Me Coach – Beta
+# Hear Me Coach
 
-Spieler teilen Trainingsvideos (TikTok, Instagram, YouTube, Facebook) als Link in den Pool ihrer Mannschaft.
-Mitspieler upvoten. Ab der Schwelle landet der Beitrag beim Coach, der bewertet, Notizen macht und ihn ins Training aufnimmt.
+Spieler finden Trainingsvideos auf TikTok, Instagram oder YouTube und teilen sie mit ihrer Mannschaft. Alle stimmen ab, ab einer Schwelle landet das Video beim Coach. Der Coach bewertet, nimmt Übungen ins Training auf, stellt Trainingseinheiten zusammen, und nach dem Training bewertet die Mannschaft die Einheit. Wer allein trainiert, nutzt den Solo-Modus als eigene Sammlung mit Statistik.
+
+| | |
+|---|---|
+| **Web-App (live)** | https://j3sk0.github.io/hear-me-coach/ |
+| **Datenbank** | Supabase-Projekt `hear-me-coach` (eu-central-1, Frankfurt) |
+| **Native App** | `mobile/` (Expo, iOS und Android) – Einrichtung siehe [ANLEITUNG-APP.md](ANLEITUNG-APP.md) |
+| **Lastenheft** | [SPEC.md](SPEC.md) |
+
+## Funktionen
+
+**Mannschaft**
+- Mannschaft anlegen (Sportart wählbar, Farbe und Feldlinien je Sportart, Vereinsfarbe und -logo)
+- Beitritt per Spieler-Code, Co-Trainer per Coach-Code
+- Videos teilen: direkt aus TikTok/Instagram/YouTube (native App, Android-Web-App), per Link oder Einfügen-Knopf
+- Kategorien (Aufwärmen, Technik, Spielform, Taktik, Abschluss, Kondition, Ausklang); neue Begriffe wachsen automatisch in die Liste
+- Anonym teilen: Mitspieler sehen keinen Namen, der Coach immer
+- Upvotes mit einstellbarer Schwelle; ab Schwelle Status „Beim Coach“
+- Coach: Sterne, Notiz (privat oder für alle), Ins Training / Angeschaut / Ablehnen mit Grund
+- Trainingsplan: Einheiten mit Datum, Ort, Übungen und Minuten; Entwurf oder veröffentlicht
+- Bewertung nach dem Training (ab Trainingsbeginn), Durchschnitt für alle, Kommentare anonym für den Coach
+- „✓ Gemacht“ für Übungen, persönliche Statistik (Tage, Wochen, Kategorien, Top 5)
+
+**Solo-Modus**
+- Eigene Sammlung ohne Coach, Kategorien nach Muskelgruppen, Sterne direkt auf der Karte, Favorit/Okay/Nicht meins, Sortierung, Statistik
+
+**Konto und Geräte**
+- Kein Passwort, keine E-Mail: Beim Beitreten gibt es einen persönlichen Zugangscode (`XXXX-XXXX-XXXX`), mit dem man sich auf jedem Gerät anmeldet. Code erneuerbar, einzelne Geräte abmeldbar.
+
+**Benachrichtigungen** (über die native App)
+- Neues Video, Upvotes (gebündelt über 10 Minuten), Videos mit genug Upvotes (Coach, gebündelt), Video ins Training aufgenommen, neuer Trainingsplan, Erinnerung zur Bewertung nach dem Training, Ergebnis 24 Stunden später
+- Jede Art einzeln abschaltbar, Nachtruhe 22–7 Uhr
 
 ## Aufbau
-- `docs/` – PWA (eine HTML-Datei, Manifest mit Share Target, Service Worker, Icons). Keine Build-Schritte.
-- `supabase/migrations/0001_init.sql` – Datenbank. Bereits angewendet auf Projekt `hear-me-coach` (eu-central-1).
-- `SPEC.md` – Lastenheft.
 
-## Zugang (Beta)
-Kein Passwort: Coach legt Mannschaft an und bekommt Spieler-Code und Co-Trainer-Code.
-Wer mit Code beitritt, bekommt einen persönlichen Schlüssel, gespeichert im Browser.
-Alle Daten laufen über Datenbank-Funktionen, die den Schlüssel prüfen. Tabellen sind für Clients gesperrt.
-Anonymität wird in der Datenbank durchgesetzt: Spieler bekommen bei anonymen Beiträgen keinen Namen geliefert.
+```
+docs/                     Web-App (eine HTML-Datei, PWA mit Manifest, Service Worker, Share Target) – von GitHub Pages ausgeliefert
+mobile/                   Native App (Expo SDK 58): WebView auf die Web-App + Teilen-Empfang + Push
+  App.tsx                 Brücke zur Web-App (window.hmcNative.share / pushToken / open)
+  app.json / app.config.js  App-Konfiguration, Teilen-Erweiterung, Icons
+  plugins/                eigener Config-Plugin (Name der iOS-Teilen-Erweiterung)
+  eas.json                Build-Profile (preview = APK, production = Stores)
+supabase/migrations/      Datenbank-Schema und Funktionen in Reihenfolge 0001–0008
+.github/workflows/        „App bauen“: Build in der Expo-Cloud per Knopfdruck
+SPEC.md                   Lastenheft
+ANLEITUNG-APP.md          Konten anlegen, App bauen, verteilen
+```
 
-## Demo
-Ohne Verbindung zu Supabase (oder mit `?demo`) startet die App mit Beispieldaten und einem Personen-Umschalter.
+Die native App lädt die Web-App. Änderungen an der Web-App sind deshalb sofort auch in der App sichtbar. Nur Änderungen an nativen Teilen (Teilen-Empfang, Push, Icons, Name) brauchen einen neuen App-Build.
 
-## Veröffentlichen
-Der Ordner `docs/` muss über HTTPS erreichbar sein (für Installation und Teilen-Menü), z. B.:
-- GitHub Pages, Cloudflare Pages oder Netlify: Ordner `docs/` hochladen.
-- Eigener Server: beliebiger Webserver mit TLS, z. B. Caddy:
-  `docker run -d -p 443:443 -v $PWD/app:/srv caddy caddy file-server --domain coach.example.de --root /srv`
+## Datenbank und Sicherheit
 
-## Bekannte Grenzen der Beta
-- Ohne Passwort: Wer den Browser-Speicher löscht, muss neu beitreten (neues Profil).
-- iPhone: Kein Eintrag im Teilen-Menü (Einschränkung von iOS für Web-Apps), Link kopieren und einfügen.
-- Vorschaubilder: TikTok und YouTube automatisch, Instagram nur als Linkkarte.
-- Kein Telegram-Bot und keine Push-Nachrichten.
+- Alle Tabellen sind für Clients gesperrt (Row Level Security ohne Policies). Zugriff nur über `SECURITY DEFINER`-Funktionen, die den persönlichen Schlüssel des Geräts prüfen (`member_token`, gespeichert als SHA-256).
+- Zugangscodes und Teilen-Schlüssel werden nur als Hash gespeichert.
+- Anonymität wird in der Datenbank durchgesetzt (`list_posts` liefert Spielern bei anonymen Beiträgen keinen Namen).
+- Der Supabase-Schlüssel in der Web-App ist der öffentliche „publishable key“ und darf im Code stehen.
 
-## Live
-GitHub Pages veröffentlicht den Ordner `docs/` unter https://j3sk0.github.io/hear-me-coach/
+**Tabellen:** `team`, `member`, `member_token`, `post`, `upvote`, `coach_review`, `category`, `workout_log`, `training_session`, `session_item`, `session_rating`, `push_device`, `notify_pref`, `notification_outbox`
+
+**API-Funktionen (RPC):**
+| Bereich | Funktionen |
+|---|---|
+| Konto | `create_team`, `join_team`, `login_with_code`, `new_login_code`, `logout`, `whoami`, `leave_team` |
+| Pool | `list_posts`, `add_post`, `toggle_upvote`, `delete_post`, `set_post_category` |
+| Coach | `review_post`, `rate_post`, `set_threshold`, `set_team`, `set_team_style`, `add_category`, `delete_category` |
+| Training | `list_sessions`, `save_session`, `publish_session`, `delete_session`, `rate_session`, `log_workout`, `undo_workout`, `list_my_log` |
+| Teilen per Schlüssel | `new_share_key`, `share_link` |
+| Benachrichtigungen | `register_push`, `unregister_push`, `get_notify_prefs`, `set_notify_prefs` |
+
+**Benachrichtigungen intern:** Trigger auf `post`, `upvote` und `training_session` schreiben in `notification_outbox`. Ein `pg_cron`-Job (`hmc-send-push`, jede Minute) erzeugt Erinnerungen und Ergebnisse, beachtet Einstellungen und Nachtruhe und schickt fällige Nachrichten per `pg_net` an den Expo-Push-Dienst.
+
+## Entwicklung
+
+- Web-App: `docs/index.html` direkt bearbeiten, lokal mit `python3 -m http.server` im Ordner `docs/` testen. Ohne Verbindung zur Datenbank (oder mit `?demo`) startet eine Demo mit Beispieldaten und Personen-Umschalter.
+- Datenbank: neue Migration als `supabase/migrations/00NN_name.sql` anlegen und im Supabase-Projekt anwenden.
+- App: `cd mobile && npm ci && npx tsc --noEmit`. Builds laufen in der Expo-Cloud, siehe [ANLEITUNG-APP.md](ANLEITUNG-APP.md).

@@ -157,3 +157,13 @@ In Phase 1 ist alles kostenlos.
 **Trainings-Protokoll und Statistik:** „✓ Gemacht“ trägt eine Übung mit Datum ein (zurücknehmbar). Im Solo-Modus bei allen Übungen, in Mannschaften bei Übungen, die der Coach ins Training aufgenommen hat. Statistik pro Person: Trainingstage, Übungen gesamt, Tage diese Woche, Wochen in Folge, Balken der letzten 12 Wochen, Verteilung nach Kategorie, Top 5, „länger nicht gemacht“.
 
 **Zugang Beta:** Kein Passwort. Beitritt per Code, persönlicher Schlüssel im Browser. Alle Zugriffe laufen über Datenbank-Funktionen, die den Schlüssel prüfen.
+
+## 16. Ergänzungen (Stand 28.11.2026)
+
+**Dauerhafte Anmeldung ohne E-Mail:** Persönlicher Zugangscode (12 Zeichen, `XXXX-XXXX-XXXX`) beim Beitreten. Anmeldung auf beliebig vielen Geräten, Code erneuerbar, einzelne Geräte abmeldbar. Grund: Auf dem iPhone haben Safari und die installierte Web-App getrennte Speicher.
+
+**Trainingsplan und Bewertung:** Coach stellt Einheiten (Titel, Beginn, Dauer, Ort, Notiz, Übungen mit Minuten) aus aufgenommenen Videos zusammen, als Entwurf oder veröffentlicht. Ab Trainingsbeginn bewertet jedes Mitglied einmal (1–5 Sterne, Kommentar). Durchschnitt für alle, Kommentare anonym nur für den Coach.
+
+**Benachrichtigungen:** neues Video, Upvotes (gebündelt), Videos mit genug Upvotes (Coach), Video aufgenommen, neuer Trainingsplan, Bewertungs-Erinnerung nach Trainingsende, Ergebnis nach 24 Stunden. Einzeln abschaltbar, Nachtruhe 22–7 Uhr. Versand über Expo Push aus der Datenbank (pg_cron, pg_net).
+
+**Native App (Expo):** Lädt die Web-App und ergänzt Teilen-Empfang aus TikTok/Instagram/YouTube (iOS Share Extension, Android Intent) und Push. Verteilung: Android per APK oder Play Store (geschlossener Test), iPhone per TestFlight. Einrichtung: ANLEITUNG-APP.md.

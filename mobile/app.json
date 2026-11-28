@@ -1,0 +1,60 @@
+{
+  "expo": {
+    "name": "Hear Me Coach",
+    "slug": "hear-me-coach",
+    "scheme": "hearmecoach",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "backgroundColor": "#151d19",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#151d19"
+    },
+    "ios": {
+      "bundleIdentifier": "com.j3sk0.hearmecoach",
+      "supportsTablet": false,
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.j3sk0.hearmecoach",
+      "adaptiveIcon": {
+        "backgroundColor": "#151d19",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "./plugins/withShareExtensionName",
+      [
+        "expo-share-intent",
+        {
+          "iosActivationRules": {
+            "NSExtensionActivationSupportsWebURLWithMaxCount": 1,
+            "NSExtensionActivationSupportsWebPageWithMaxCount": 1,
+            "NSExtensionActivationSupportsText": true
+          },
+          "androidIntentFilters": [
+            "text/*"
+          ]
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#ff5a3c"
+        }
+      ]
+    ],
+    "extra": {
+      "webAppUrl": "https://j3sk0.github.io/hear-me-coach/"
+    }
+  }
+}
