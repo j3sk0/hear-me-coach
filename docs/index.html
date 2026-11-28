@@ -117,6 +117,9 @@ textarea{min-height:80px;resize:vertical}
 .pickrow input[type=checkbox]{width:22px;height:22px;accent-color:var(--bg)}.pickrow input[type=number]{min-height:38px;padding:6px 8px}
 .toggles .switch{margin-top:8px;font-weight:500}
 .install{border:2px solid var(--acc)}
+.mlist{list-style:none;margin:8px 0 0;padding:0}.mlist li{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--line)}
+.mlist li.dup{background:var(--acc2);border-radius:10px;padding:10px}.btn.sm{min-height:36px;padding:0 10px;font-size:14px}
+.warn{color:var(--acc);font-weight:600}.warnline{color:var(--acc);font-weight:600}
 .qrbox{display:block;width:150px;height:150px;padding:6px;background:#fff;border:1px solid var(--line);border-radius:12px;cursor:zoom-in}
 .qrbox svg{display:block;width:100%;height:100%}.qrbox svg rect[fill="white"],.qrbox svg path{shape-rendering:crispEdges}
 .invgrid{display:grid;grid-template-columns:150px minmax(0,1fr);gap:16px;align-items:center}
@@ -187,7 +190,7 @@ const store = {
   set(k,v){ try { localStorage.setItem('hmc_'+k, JSON.stringify(v)); } catch {} },
   del(k){ try { localStorage.removeItem('hmc_'+k); } catch {} }
 };
-const ERR = {not_ratable:'Bewerten geht erst ab Trainingsbeginn.', invalid_code:'Code nicht gefunden.', not_authorized:'Bitte neu anmelden.', invalid_login:'Zugangscode nicht gefunden. Bitte genau prüfen.', invalid_key:'Teilen-Schlüssel ungültig.', invalid_url:'Das sieht nicht wie ein Link aus.',
+const ERR = {name_taken:'Den Namen gibt es in der Mannschaft schon. Ergänze Nachnamen, Initial oder Spitznamen.', invalid_name:'Bitte einen Namen eingeben.', not_ratable:'Bewerten geht erst ab Trainingsbeginn.', invalid_code:'Code nicht gefunden.', not_authorized:'Bitte neu anmelden.', invalid_login:'Zugangscode nicht gefunden. Bitte genau prüfen.', invalid_key:'Teilen-Schlüssel ungültig.', invalid_url:'Das sieht nicht wie ein Link aus.',
   own_post:'Eigene Beiträge kannst du nicht upvoten.', coach_only:'Nur für den Coach.', not_allowed:'Das darfst du nicht.', not_found:'Beitrag nicht gefunden.'};
 const STATUS = {new:'Neu', relevant:'Beim Coach', seen:'Angeschaut', adopted:'Ins Training aufgenommen', rejected:'Abgelehnt'};
 const PL = {tiktok:'TikTok', instagram:'Instagram', youtube:'YouTube', facebook:'Facebook', web:'Link'};
@@ -266,6 +269,7 @@ function makeDemo(kind){
       if (fn === 'join_team') {
         const c = String(a.p_code || '').trim().toUpperCase();
         if (!team || (c !== team.player_code && c !== team.coach_code)) throw new Error(ERR.invalid_code);
+        if (members.some(x => x.name.trim().toLowerCase() === a.p_name.trim().toLowerCase())) throw new Error(ERR.name_taken);
         const id = 'j' + members.length; members.push({id, name:a.p_name.trim() || 'Gast', role: c === team.coach_code ? 'coach' : 'player'}); me = id;
         return {...(await api.call('whoami', {})), token:'demo', login_code:'DEMO-' + code().slice(0, 4) + '-' + code().slice(0, 4)};
       }
@@ -331,6 +335,17 @@ function makeDemo(kind){
         case 'rate_session': { const x = sessions.find(q => q.id === a.p_id); if (!x || x.t > Date.now()) throw new Error('Bewerten geht erst ab Trainingsbeginn.');
           x.ratings[me] = [a.p_stars, a.p_comment || null]; return null; }
         case 'team_preview': return null;
+        case 'rename_me': { const v = a.p_name.trim(); if (!v) throw new Error(ERR.invalid_name);
+          if (members.some(x => x.id !== me && x.name.trim().toLowerCase() === v.toLowerCase())) throw new Error(ERR.name_taken);
+          members.find(x => x.id === me).name = v; demoHooks.refresh(); return null; }
+        case 'list_members': if (!coach) throw new Error(ERR.coach_only);
+          return members.map(x => ({id:x.id, name:x.name, role:x.role, joined:new Date(now - 3*d).toISOString(), me:x.id === me, has_code:true, devices:1, push:false,
+            videos:posts.filter(p => p.by === x.id).length, upvotes:posts.filter(p => p.votes.includes(x.id)).length}));
+        case 'merge_members': { if (!coach) throw new Error(ERR.coach_only); const k = a.p_keep, dr = a.p_drop;
+          posts.forEach(p => { if (p.by === dr) p.by = k; p.votes = [...new Set(p.votes.map(v => v === dr ? k : v))].filter(v => v !== p.by); });
+          members = members.filter(x => x.id !== dr); demoHooks.refresh(); return null; }
+        case 'remove_member': { if (!coach) throw new Error(ERR.coach_only); members = members.filter(x => x.id !== a.p_member);
+          posts.forEach(p => { if (p.by === a.p_member) p.by = null; p.votes = p.votes.filter(v => v !== a.p_member); }); demoHooks.refresh(); return null; }
         case 'get_notify_prefs': return {new_post:true, upvotes:true, coach_queue:true, adopted:true, new_session:true, rate_reminder:true, results:true, quiet_hours:true, devices:0};
         case 'set_notify_prefs': case 'register_push': case 'unregister_push': return null;
         case 'new_login_code': return 'DEMO-' + code().slice(0, 4) + '-' + code().slice(0, 4);
@@ -467,6 +482,7 @@ async function load(){
     if (S.tab === 'stats') S.log = await api.call('list_my_log', {p_token:token()});
     if (S.tab === 'training' && S.me.team.mode === 'team') S.sessions = await api.call('list_sessions', {p_token:token()});
     if (S.tab === 'team' && S.me.team.mode === 'team' && !demo) S.prefs = await api.call('get_notify_prefs', {p_token:token()}).catch(() => null);
+    if (S.tab === 'team' && S.me.team.mode === 'team' && S.me.role === 'coach') S.members = await api.call('list_members', {p_token:token()}).catch(() => null);
     if (!load.told) { load.told = true; nativeLoggedIn(); }
     render();
   } catch (e) {
@@ -752,6 +768,8 @@ function teamView(coach){
       <div class="row"><input id="newCat" type="text" maxlength="30" placeholder="${solo ? 'z. B. Waden' : 'z. B. Abwehr'}" style="flex:1"><button class="btn" id="addCat">Hinzufügen</button></div></section>`;
   const lc = store.get('login_code');
   const access = `<section class="card"><h2 style="font-size:26px">Mein Zugang</h2>
+      <label for="myName">Mein Name ${solo ? '' : '<span class="small">(so sehen dich die anderen)</span>'}</label>
+      <div class="row" style="flex-wrap:nowrap"><input id="myName" type="text" maxlength="40" value="${esc(S.me.name)}" style="flex:1"><button class="btn" id="saveName">Ändern</button></div>
       <p class="small">Mit deinem Zugangscode meldest du dich auf jedem Gerät an, auch in der installierten App.</p>
       ${lc ? `<div class="code" style="font-size:30px">${esc(lc)}</div>` : '<p>Auf diesem Gerät ist kein Code gespeichert. Erzeuge einen neuen, falls du ihn nicht mehr hast.</p>'}
       <div class="row" style="margin-top:8px">${lc ? '<button class="btn" id="cpMyCode">Code kopieren</button>' : ''}
@@ -773,7 +791,9 @@ function teamView(coach){
             Anfragetext <b>JSON</b>: Feld <b>p_key</b> = dein Teilen-Schlüssel, Feld <b>p_text</b> = <b>Kurzbefehleingabe</b>.</li>
           <li>Aktion <b>Wörterbuchwert abrufen</b>: Schlüssel <b>message</b>. Danach <b>Mitteilung anzeigen</b> mit dem Wörterbuchwert.</li>
           <li>Fertig. Zum Weitergeben: Kurzbefehl teilen → <b>iCloud-Link kopieren</b>. Vorher beim Feld p_key „Beim Import fragen“ einstellen, dann fragt der Kurzbefehl jeden nach seinem eigenen Schlüssel.</li></ol></details></section>`;
-  return `${invite}${access}${notifyBox()}${coachBox}${IS_ANDROID || IN_APP ? '' : shortcut}
+  const membersBox = coach && !solo ? `<section class="card"><h2 style="font-size:26px">Mitglieder${S.members ? ` (${S.members.length})` : ''}</h2>
+      ${S.members ? membersList() : '<p class="small">Wird geladen …</p>'}</section>` : '';
+  return `${invite}${membersBox}${access}${notifyBox()}${coachBox}${IS_ANDROID || IN_APP ? '' : shortcut}
     <section class="card"><h2 style="font-size:26px">So speicherst du ein Video</h2>
       <p><b>Android:</b> App installieren (Chrome-Menü ⋮ → „App installieren“). Danach in TikTok oder Instagram auf <i>Teilen</i> tippen und <b>Hear Me Coach</b> wählen.</p>
       <p><b>iPhone:</b> Kurzbefehl „Hear Me Coach“ nutzen (siehe oben) oder im Video <i>Teilen → Link kopieren</i> und hier „${solo ? '+ Video speichern' : '+ Link teilen'}“ antippen. Dort auf „Einfügen“ tippen.</p>
@@ -798,8 +818,28 @@ function bindNotify(){
     catch (e) { c.checked = !c.checked; toast(e.message); } });
   const po = $('#pushOn'); if (po) po.onclick = () => toNative({type:'enablePush'});
 }
+function membersList(){
+  const ms = S.members, dup = new Set(ms.filter((m, i) => ms.findIndex(x => x.name.trim().toLowerCase() === m.name.trim().toLowerCase()) !== i).map(m => m.name.trim().toLowerCase()));
+  return `${dup.size ? '<p class="small warnline">Gleiche Namen gefunden. Wenn das dieselbe Person auf zwei Geräten ist, führe die Profile zusammen.</p>' : ''}
+    <ul class="mlist">${ms.map(m => `<li class="${dup.has(m.name.trim().toLowerCase()) ? 'dup' : ''}">
+      <div><b>${esc(m.name)}</b>${m.me ? ' <span class="small">(du)</span>' : ''} <span class="chip">${m.role === 'coach' ? 'Coach' : 'Spieler'}</span>
+        <div class="small">seit ${fmtDay(m.joined)} · ${m.videos} Videos · ${m.upvotes} Upvotes · ${m.devices} ${m.devices === 1 ? 'Gerät' : 'Geräte'}${m.has_code ? '' : ' · <span class="warn">kein Zugangscode</span>'}${m.push ? ' · Push an' : ''}</div></div>
+      ${m.me ? '' : `<div class="row"><button class="btn alt sm" data-merge="${esc(m.id)}">Zusammenführen …</button><button class="btn alt sm" data-rm="${esc(m.id)}">Entfernen</button></div>`}</li>`).join('')}</ul>`;
+}
+function openMerge(id){
+  const d = S.members.find(m => m.id === id), others = S.members.filter(m => m.id !== id);
+  sheet(`<h2>„${esc(d.name)}“ zusammenführen</h2>
+    <p>Alles von diesem Profil (Videos, Upvotes, Bewertungen, angemeldete Geräte) wird in das gewählte Profil übernommen. Danach gibt es nur noch eins.</p>
+    <label for="mg">Übernehmen in</label><select id="mg">${others.map(o => `<option value="${esc(o.id)}" ${o.name.trim().toLowerCase() === d.name.trim().toLowerCase() ? 'selected' : ''}>${esc(o.name)} (${o.role === 'coach' ? 'Coach' : 'Spieler'}, seit ${fmtDay(o.joined)})</option>`).join('')}</select>
+    <div class="row" style="margin-top:14px"><button class="btn acc" id="mgOk">Zusammenführen</button><button class="btn alt" data-close>Abbrechen</button></div>`);
+  $('#mgOk').onclick = async () => { try { await api.call('merge_members', {p_token:token(), p_keep:$('#mg').value, p_drop:id}); closeSheet(); toast('Zusammengeführt'); await load(); } catch (e) { toast(e.message); } };
+}
 function bindTeam(){
   bindNotify();
+  document.querySelectorAll('[data-merge]').forEach(b => b.onclick = () => openMerge(b.dataset.merge));
+  document.querySelectorAll('[data-rm]').forEach(b => b.onclick = () => { const m = S.members.find(x => x.id === b.dataset.rm);
+    confirmSheet(`${m.name} entfernen?`, 'Das Profil wird gelöscht. Geteilte Videos bleiben ohne Namen im Pool. Mit dem Spieler-Code kann die Person neu beitreten.', 'Entfernen', async () => {
+      await api.call('remove_member', {p_token:token(), p_member:m.id}); toast('Entfernt'); await load(); }); });
   const invText = () => `Komm in unseren Trainings-Pool „${S.me.team.name}“ bei Hear Me Coach: ${inviteUrl(S.me.team.player_code)} (Code: ${S.me.team.player_code}). Nach dem Beitreten bekommst du einen persönlichen Zugangscode – unbedingt speichern!`;
   ['#qrBig', '#qrBig2'].forEach(id => { const b = $(id); if (b) b.onclick = showInviteQr; });
   const si = $('#shareInvite'); if (si) si.onclick = () => navigator.share({title:'Hear Me Coach', text:invText()}).catch(() => {});
@@ -824,6 +864,8 @@ function bindTeam(){
     document.querySelectorAll('[data-delcat]').forEach(b => b.onclick = async () => {
       try { await api.call('delete_category', {p_token:token(), p_name:b.dataset.delcat}); await load(); } catch (e) { toast(e.message); } });
   }
+  $('#saveName').onclick = async () => { const v = $('#myName').value.trim(); if (!v || v === S.me.name) return;
+    try { await api.call('rename_me', {p_token:token(), p_name:v}); toast('Name geändert'); await load(); } catch (e) { toast(e.message); } };
   const cm = $('#cpMyCode'); if (cm) cm.onclick = async () => { try { await navigator.clipboard.writeText(store.get('login_code')); toast('Code kopiert'); } catch { toast(store.get('login_code')); } };
   $('#newCode').onclick = () => confirmSheet('Neuen Zugangscode erzeugen?', 'Der bisherige Code funktioniert danach nicht mehr. Angemeldete Geräte bleiben angemeldet.', 'Erzeugen', async () => {
     const c = await api.call('new_login_code', {p_token:token()}); showCodeSheet(c, false); return 'keep'; });
@@ -952,7 +994,7 @@ function onboarding(){
       <p class="small">Den Code hast du beim ersten Beitreten bekommen. In der App findest du ihn unter „Team“ bzw. „Einstellungen“.</p></section>
     <section class="card"><h2 style="font-size:26px">Mannschaft beitreten</h2>
       <form id="joinForm"><label for="jc">Code vom Coach</label><input id="jc" type="text" autocapitalize="characters" autocomplete="off" required maxlength="12">
-        <label for="jn">Dein Name</label><input id="jn" type="text" maxlength="40" required autocomplete="given-name">
+        <label for="jn">Dein Name</label><input id="jn" type="text" maxlength="40" required autocomplete="given-name" placeholder="Vorname, gern mit Initial: Malte K.">
         <div class="row" style="margin-top:14px"><button class="btn acc">Beitreten</button></div></form></section>
     <section class="card"><h2 style="font-size:26px">Ich bin Coach</h2>
       <form id="createForm"><label for="tn">Mannschaft</label><input id="tn" type="text" maxlength="80" required placeholder="z. B. Damen 1 TV Musterstadt">
@@ -975,7 +1017,7 @@ function inviteOnboarding(){
     ${installBanner()}
     <section class="card"><h2 style="font-size:26px">Beitreten</h2>
       <form id="joinForm"><input id="jc" type="hidden" value="${esc(S.inviteCode)}">
-        <label for="jn">Dein Name (so sehen dich die anderen)</label><input id="jn" type="text" maxlength="40" required autocomplete="given-name" autofocus>
+        <label for="jn">Dein Name (so sehen dich die anderen)</label><input id="jn" type="text" maxlength="40" required autocomplete="given-name" autofocus placeholder="Vorname, gern mit Initial: Malte K.">
         <div class="row" style="margin-top:14px"><button class="btn acc">Jetzt beitreten</button></div></form>
       <p class="small">Danach bekommst du deinen persönlichen Zugangscode. Den musst du speichern, damit du dich später in der App oder auf einem neuen Handy wieder anmelden kannst.</p></section>
     <section class="card"><h2 style="font-size:22px">Schon dabei?</h2>
@@ -990,8 +1032,27 @@ function bindOnboarding(){
   $('#loginForm').onsubmit = async e => { e.preventDefault();
     try { const r = await api.call('login_with_code', {p_code:$('#lc').value}); toast('Willkommen zurück, ' + r.name + '!'); done(r); } catch (err) { toast(err.message); } };
   $('#lc').oninput = e => { const p = e.target.selectionStart === e.target.value.length; e.target.value = fmtCode(e.target.value).slice(0, 14); };
-  $('#joinForm').onsubmit = async e => { e.preventDefault();
-    try { done(await api.call('join_team', {p_code:$('#jc').value, p_name:$('#jn').value})); } catch (err) { toast(err.message); } };
+  const join = async () => {
+    try { done(await api.call('join_team', {p_code:$('#jc').value, p_name:$('#jn').value})); }
+    catch (err) {
+      if (err.message !== ERR.name_taken) return toast(err.message);
+      const n = $('#jn').value.trim();
+      sheet(`<h2>„${esc(n)}“ gibt es hier schon</h2>
+        <p><b>Bist du das?</b> Dann melde dich mit deinem Zugangscode an. So bleiben deine Videos und Upvotes in einem Profil.</p>
+        <div class="row"><button class="btn acc" id="ntLogin">Ich bin das: mit Code anmelden</button></div>
+        <p style="margin-top:16px"><b>Du bist jemand anderes?</b> Dann ergänze deinen Namen, damit euch alle auseinanderhalten können.</p>
+        <label for="nt2">Name mit Nachname, Initial oder Spitzname</label>
+        <input id="nt2" type="text" maxlength="40" value="${esc(n)} " placeholder="z. B. ${esc(n)} K. oder ${esc(n)} (Torwart)">
+        <p class="small" id="ntHint">Bitte etwas ergänzen, z. B. „${esc(n)} K.“</p>
+        <div class="row" style="margin-top:8px"><button class="btn" id="ntJoin" disabled>Mit diesem Namen beitreten</button><button class="btn alt" data-close>Abbrechen</button></div>
+        <p class="small">Kein Zugangscode, weil du vor der Einführung beigetreten bist? Dann tritt mit ergänztem Namen bei und bitte deinen Coach, die beiden Profile unter „Team → Mitglieder“ zusammenzuführen.</p>`);
+      const inp = $('#nt2'), ok = () => { const v = inp.value.trim(); const same = v.toLowerCase() === n.toLowerCase();
+        $('#ntJoin').disabled = !v || same; $('#ntHint').style.display = same ? '' : 'none'; };
+      inp.oninput = ok; ok(); setTimeout(() => { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }, 50);
+      $('#ntLogin').onclick = () => { closeSheet(); const l = $('#lc'); if (l) { l.scrollIntoView({block:'center'}); l.focus(); } };
+      $('#ntJoin').onclick = () => { $('#jn').value = inp.value.trim(); closeSheet(); join(); };
+    } };
+  $('#joinForm').onsubmit = e => { e.preventDefault(); join(false); };
   if (S.invite) { bindInstall(); setTimeout(() => $('#jn') && $('#jn').focus(), 100); return; }
   const sport = bindSportPicker();
   $('#createForm').onsubmit = async e => { e.preventDefault();

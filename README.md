@@ -29,6 +29,11 @@ Spieler finden Trainingsvideos auf TikTok, Instagram oder YouTube und teilen sie
 **Einladen**
 - QR-Code und Einladungslink (`…/hear-me-coach/?code=SPIELERCODE`) im Team-Bereich. Wer den Link öffnet, sieht den Mannschaftsnamen und gibt nur noch seinen Namen ein. Ohne gültigen Code vom Coach kommt niemand in eine Mannschaft.
 
+**Mitglieder**
+- Namen sind pro Mannschaft eindeutig. Ist ein Name vergeben, fragt die App „Bist du das?“ (dann mit Zugangscode anmelden) oder verlangt einen Zusatz wie Nachname, Initial oder Spitzname.
+- Jeder kann seinen Anzeigenamen unter „Team → Mein Zugang“ ändern.
+- Der Coach sieht unter „Team → Mitglieder“ alle Mitglieder mit Videos, Upvotes, Geräten und ob ein Zugangscode existiert. Gleiche Namen werden markiert. Doppelte Profile lassen sich zusammenführen (Videos, Upvotes, Bewertungen und angemeldete Geräte wandern mit), Mitglieder lassen sich entfernen.
+
 **Konto und Geräte**
 - Kein Passwort, keine E-Mail: Beim Beitreten gibt es einen persönlichen Zugangscode (`XXXX-XXXX-XXXX`), mit dem man sich auf jedem Gerät anmeldet. Das Speichern muss bestätigt werden. Mitglieder ohne gespeicherten Code werden in der App aufgefordert, einen zu sichern. Code erneuerbar, einzelne Geräte abmeldbar.
 
@@ -45,7 +50,7 @@ mobile/                   Native App (Expo SDK 58): WebView auf die Web-App + Te
   app.json / app.config.js  App-Konfiguration, Teilen-Erweiterung, Icons
   plugins/                eigener Config-Plugin (Name der iOS-Teilen-Erweiterung)
   eas.json                Build-Profile (preview = APK, production = Stores)
-supabase/migrations/      Datenbank-Schema und Funktionen in Reihenfolge 0001–0009
+supabase/migrations/      Datenbank-Schema und Funktionen in Reihenfolge 0001–0011
 .github/workflows/        „App bauen“ (Expo-Cloud) und „Datenbank wach halten“ (alle 3 Tage)
 SPEC.md                   Lastenheft
 ANLEITUNG-APP.md          Konten anlegen, App bauen, verteilen
@@ -65,9 +70,9 @@ Die native App lädt die Web-App. Änderungen an der Web-App sind deshalb sofort
 **API-Funktionen (RPC):**
 | Bereich | Funktionen |
 |---|---|
-| Konto | `team_preview`, `create_team`, `join_team`, `login_with_code`, `new_login_code`, `logout`, `whoami`, `leave_team` |
+| Konto | `team_preview`, `create_team`, `join_team`, `rename_me`, `login_with_code`, `new_login_code`, `logout`, `whoami`, `leave_team` |
 | Pool | `list_posts`, `add_post`, `toggle_upvote`, `delete_post`, `set_post_category` |
-| Coach | `review_post`, `rate_post`, `set_threshold`, `set_team`, `set_team_style`, `add_category`, `delete_category` |
+| Coach | `list_members`, `merge_members`, `remove_member`, `review_post`, `rate_post`, `set_threshold`, `set_team`, `set_team_style`, `add_category`, `delete_category` |
 | Training | `list_sessions`, `save_session`, `publish_session`, `delete_session`, `rate_session`, `log_workout`, `undo_workout`, `list_my_log` |
 | Teilen per Schlüssel | `new_share_key`, `share_link` |
 | Benachrichtigungen | `register_push`, `unregister_push`, `get_notify_prefs`, `set_notify_prefs` |
