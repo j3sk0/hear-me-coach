@@ -26,8 +26,11 @@ Spieler finden Trainingsvideos auf TikTok, Instagram oder YouTube und teilen sie
 **Solo-Modus**
 - Eigene Sammlung ohne Coach, Kategorien nach Muskelgruppen, Sterne direkt auf der Karte, Favorit/Okay/Nicht meins, Sortierung, Statistik
 
+**Einladen**
+- QR-Code und Einladungslink (`…/hear-me-coach/?code=SPIELERCODE`) im Team-Bereich. Wer den Link öffnet, sieht den Mannschaftsnamen und gibt nur noch seinen Namen ein. Ohne gültigen Code vom Coach kommt niemand in eine Mannschaft.
+
 **Konto und Geräte**
-- Kein Passwort, keine E-Mail: Beim Beitreten gibt es einen persönlichen Zugangscode (`XXXX-XXXX-XXXX`), mit dem man sich auf jedem Gerät anmeldet. Code erneuerbar, einzelne Geräte abmeldbar.
+- Kein Passwort, keine E-Mail: Beim Beitreten gibt es einen persönlichen Zugangscode (`XXXX-XXXX-XXXX`), mit dem man sich auf jedem Gerät anmeldet. Das Speichern muss bestätigt werden. Mitglieder ohne gespeicherten Code werden in der App aufgefordert, einen zu sichern. Code erneuerbar, einzelne Geräte abmeldbar.
 
 **Benachrichtigungen** (über die native App)
 - Neues Video, Upvotes (gebündelt über 10 Minuten), Videos mit genug Upvotes (Coach, gebündelt), Video ins Training aufgenommen, neuer Trainingsplan, Erinnerung zur Bewertung nach dem Training, Ergebnis 24 Stunden später
@@ -42,8 +45,8 @@ mobile/                   Native App (Expo SDK 58): WebView auf die Web-App + Te
   app.json / app.config.js  App-Konfiguration, Teilen-Erweiterung, Icons
   plugins/                eigener Config-Plugin (Name der iOS-Teilen-Erweiterung)
   eas.json                Build-Profile (preview = APK, production = Stores)
-supabase/migrations/      Datenbank-Schema und Funktionen in Reihenfolge 0001–0008
-.github/workflows/        „App bauen“: Build in der Expo-Cloud per Knopfdruck
+supabase/migrations/      Datenbank-Schema und Funktionen in Reihenfolge 0001–0009
+.github/workflows/        „App bauen“ (Expo-Cloud) und „Datenbank wach halten“ (alle 3 Tage)
 SPEC.md                   Lastenheft
 ANLEITUNG-APP.md          Konten anlegen, App bauen, verteilen
 ```
@@ -62,7 +65,7 @@ Die native App lädt die Web-App. Änderungen an der Web-App sind deshalb sofort
 **API-Funktionen (RPC):**
 | Bereich | Funktionen |
 |---|---|
-| Konto | `create_team`, `join_team`, `login_with_code`, `new_login_code`, `logout`, `whoami`, `leave_team` |
+| Konto | `team_preview`, `create_team`, `join_team`, `login_with_code`, `new_login_code`, `logout`, `whoami`, `leave_team` |
 | Pool | `list_posts`, `add_post`, `toggle_upvote`, `delete_post`, `set_post_category` |
 | Coach | `review_post`, `rate_post`, `set_threshold`, `set_team`, `set_team_style`, `add_category`, `delete_category` |
 | Training | `list_sessions`, `save_session`, `publish_session`, `delete_session`, `rate_session`, `log_workout`, `undo_workout`, `list_my_log` |
@@ -70,6 +73,12 @@ Die native App lädt die Web-App. Änderungen an der Web-App sind deshalb sofort
 | Benachrichtigungen | `register_push`, `unregister_push`, `get_notify_prefs`, `set_notify_prefs` |
 
 **Benachrichtigungen intern:** Trigger auf `post`, `upvote` und `training_session` schreiben in `notification_outbox`. Ein `pg_cron`-Job (`hmc-send-push`, jede Minute) erzeugt Erinnerungen und Ergebnisse, beachtet Einstellungen und Nachtruhe und schickt fällige Nachrichten per `pg_net` an den Expo-Push-Dienst.
+
+## Daten bleiben erhalten
+
+Web-App, Demo-freie Live-Version und native App nutzen **dieselbe Datenbank**. Mannschaften, Mitglieder, Videos, Upvotes, Trainingspläne und Bewertungen werden beim Wechsel in die App übernommen. Jedes Mitglied meldet sich in der App einmal mit seinem Zugangscode an. Datenbank-Änderungen werden nur als neue Migrationen ergänzt, bestehende Daten werden dabei nicht gelöscht.
+
+**Hinweis zum kostenlosen Supabase-Tarif:** Projekte werden nach etwa einer Woche ohne Aktivität pausiert (Daten bleiben erhalten und lassen sich wiederherstellen), und es gibt keine automatischen Backups. Der Workflow „Datenbank wach halten“ fragt deshalb alle 3 Tage die Datenbank ab. Für den produktiven Betrieb mit vielen Mannschaften empfiehlt sich der Pro-Tarif (tägliche Backups, keine Pausen).
 
 ## Entwicklung
 
