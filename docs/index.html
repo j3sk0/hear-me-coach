@@ -107,6 +107,10 @@ textarea{min-height:80px;resize:vertical}
 .hero h1{font-size:clamp(40px,10vw,56px)}
 .hero p{font-size:18px;opacity:.9;max-width:34em}
 .board{display:block;width:100%;height:auto;margin:10px 0 6px}
+.install{border:2px solid var(--acc)}.install h3{font-size:22px;margin-bottom:6px}.install ol{margin:6px 0;padding-left:1.3em}.install li{margin:4px 0}
+.ico{width:18px;height:18px;vertical-align:-3px}.nowrap{white-space:nowrap}
+.steps{margin:6px 0;padding-left:1.3em}.steps li{margin:6px 0}
+.keybox{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:14px;padding:10px;border:1.5px dashed var(--line);border-radius:10px;overflow-wrap:anywhere;margin:8px 0}
 .picks{display:flex;flex-wrap:wrap;gap:8px;margin-top:6px}
 .pick{min-height:40px;padding:4px 14px;border-radius:999px;border:1.5px solid var(--line);background:transparent;color:var(--ink);font-weight:600}
 .pick[aria-pressed=true]{background:var(--bg);border-color:var(--bg);color:var(--chalk)}
@@ -155,7 +159,7 @@ const store = {
   set(k,v){ try { localStorage.setItem('hmc_'+k, JSON.stringify(v)); } catch {} },
   del(k){ try { localStorage.removeItem('hmc_'+k); } catch {} }
 };
-const ERR = {invalid_code:'Code nicht gefunden.', not_authorized:'Bitte neu beitreten.', invalid_url:'Das sieht nicht wie ein Link aus.',
+const ERR = {invalid_code:'Code nicht gefunden.', not_authorized:'Bitte neu anmelden.', invalid_login:'Zugangscode nicht gefunden. Bitte genau prüfen.', invalid_key:'Teilen-Schlüssel ungültig.', invalid_url:'Das sieht nicht wie ein Link aus.',
   own_post:'Eigene Beiträge kannst du nicht upvoten.', coach_only:'Nur für den Coach.', not_allowed:'Das darfst du nicht.', not_found:'Beitrag nicht gefunden.'};
 const STATUS = {new:'Neu', relevant:'Beim Coach', seen:'Angeschaut', adopted:'Ins Training aufgenommen', rejected:'Abgelehnt'};
 const PL = {tiktok:'TikTok', instagram:'Instagram', youtube:'YouTube', facebook:'Facebook', web:'Link'};
@@ -222,13 +226,14 @@ function makeDemo(kind){
         members = [{id:'c', name:a.p_coach_name.trim() || 'Ich', role:'coach'}];
         if (!sm) members.push({id:'x1', name:'Mitspieler Alex', role:'player'}, {id:'x2', name:'Mitspielerin Bo', role:'player'}, {id:'x3', name:'Mitspieler Chris', role:'player'});
         posts = []; logs = []; me = 'c';
-        return {...(await api.call('whoami', {})), token:'demo'};
+        return {...(await api.call('whoami', {})), token:'demo', login_code:'DEMO-' + code().slice(0, 4) + '-' + code().slice(0, 4)};
       }
+      if (fn === 'login_with_code') throw new Error('In der Demo gibt es keine Anmeldung. Nutze die echte App.');
       if (fn === 'join_team') {
         const c = String(a.p_code || '').trim().toUpperCase();
         if (!team || (c !== team.player_code && c !== team.coach_code)) throw new Error(ERR.invalid_code);
         const id = 'j' + members.length; members.push({id, name:a.p_name.trim() || 'Gast', role: c === team.coach_code ? 'coach' : 'player'}); me = id;
-        return {...(await api.call('whoami', {})), token:'demo'};
+        return {...(await api.call('whoami', {})), token:'demo', login_code:'DEMO-' + code().slice(0, 4) + '-' + code().slice(0, 4)};
       }
       if (!team || !members.find(x => x.id === me)) throw new Error(ERR.not_authorized);
       const m = members.find(x => x.id === me), coach = m.role === 'coach';
@@ -274,6 +279,8 @@ function makeDemo(kind){
           return {post_id:l.post_id, done_at:new Date(l.t).toISOString(), title:p.title, category:p.category, platform:p.platform}; });
         case 'set_threshold': { if (!coach) throw new Error(ERR.coach_only); team.threshold = a.p_threshold;
           posts.forEach(p => { if (p.status === 'new' && p.votes.length >= team.threshold) p.status = 'relevant'; }); return null; }
+        case 'new_login_code': return 'DEMO-' + code().slice(0, 4) + '-' + code().slice(0, 4);
+        case 'new_share_key': return 'hmc_demo_' + code().toLowerCase();
         case 'leave_team': if (fresh) { team = null; members = []; posts = []; logs = []; me = null; } return null;
       }
     }
@@ -406,7 +413,7 @@ async function load(){
     if (S.tab === 'stats') S.log = await api.call('list_my_log', {p_token:token()});
     render();
   } catch (e) {
-    if (/neu beitreten/.test(e.message)) { if (!demo) store.del('token'); S.me = null; render(); }
+    if (/neu anmelden/.test(e.message)) { if (!demo) store.del('token'); S.me = null; render(); }
     else toast(e.message);
   }
 }
@@ -460,7 +467,7 @@ function render(){
       <div class="names"><h1>${esc(S.me.team.name)}</h1>
         <div class="sub">${esc(S.me.team.sport)} · ${esc(S.me.name)}${solo ? '' : ' · ' + (coach ? 'Coach' : 'Spieler')} · Hear Me Coach</div></div>${modeBtn()}</header>
     <nav class="tabs" role="tablist">${tabs.map(([k,l,n]) => `<button class="tab" role="tab" data-tab="${k}" aria-selected="${S.tab===k}">${l}${n ? `<span class="n">${n}</span>` : ''}</button>`).join('')}</nav>
-    <main>${body}</main>
+    <main>${S.tab === 'team' || S.tab === 'stats' ? '' : installBanner()}${body}</main>
     <button class="fab" id="fab">${solo ? '+ Video speichern' : '+ Link teilen'}</button>`;
   app.querySelectorAll('[data-tab]').forEach(b => b.onclick = async () => { S.tab = b.dataset.tab; S.cat = '';
     if (S.tab === 'stats') { try { S.log = await api.call('list_my_log', {p_token:token()}); } catch (e) { toast(e.message); } }
@@ -468,7 +475,7 @@ function render(){
   app.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { S.cat = b.dataset.f; render(); });
   const so = $('#sort'); if (so) so.onchange = () => { S.sort = so.value; render(); };
   $('#fab').onclick = () => openShare('');
-  bindPosts(); bindMode(); if (S.tab === 'team') bindTeam();
+  bindPosts(); bindMode(); bindInstall(); if (S.tab === 'team') bindTeam();
 }
 
 function emptyView(){
@@ -591,10 +598,33 @@ function teamView(coach){
       <p class="small">Neue Kategorien, die beim Speichern eines Videos eingegeben werden, kommen automatisch dazu. Entfernen ändert keine bestehenden Beiträge.</p>
       <div class="catlist">${t.categories.map(c => `<span>${esc(c)}<button data-delcat="${esc(c)}" aria-label="${esc(c)} entfernen">×</button></span>`).join('')}</div>
       <div class="row"><input id="newCat" type="text" maxlength="30" placeholder="${solo ? 'z. B. Waden' : 'z. B. Abwehr'}" style="flex:1"><button class="btn" id="addCat">Hinzufügen</button></div></section>`;
-  return `${invite}${coachBox}
+  const lc = store.get('login_code');
+  const access = `<section class="card"><h2 style="font-size:26px">Mein Zugang</h2>
+      <p class="small">Mit deinem Zugangscode meldest du dich auf jedem Gerät an, auch in der installierten App.</p>
+      ${lc ? `<div class="code" style="font-size:30px">${esc(lc)}</div>` : '<p>Auf diesem Gerät ist kein Code gespeichert. Erzeuge einen neuen, falls du ihn nicht mehr hast.</p>'}
+      <div class="row" style="margin-top:8px">${lc ? '<button class="btn" id="cpMyCode">Code kopieren</button>' : ''}
+        <button class="btn alt" id="newCode">Neuen Code erzeugen</button><button class="btn alt" id="logoutBtn">Abmelden</button></div>
+      <p class="small">Ein neuer Code ersetzt den alten. Angemeldete Geräte bleiben angemeldet.</p></section>`;
+  const shortcut = `<section class="card"><h2 style="font-size:26px">iPhone: Teilen mit einem Tipp</h2>
+      <p>Mit dem Kurzbefehl „Hear Me Coach“ schickst du Videos direkt aus TikTok oder Instagram in den Pool, ohne Kopieren und Einfügen.</p>
+      <ol class="steps">
+        <li>Deinen Teilen-Schlüssel erzeugen und kopieren:<div class="row" style="margin-top:6px"><button class="btn" id="mkKey">Schlüssel erzeugen</button></div><div id="keyOut"></div></li>
+        ${SHORTCUT_URL ? `<li><a class="link" href="${esc(SHORTCUT_URL)}" target="_blank" rel="noopener">Kurzbefehl laden</a> und beim Hinzufügen den Schlüssel einfügen.</li>`
+          : `<li>Den Kurzbefehl einmal anlegen (Anleitung unten) oder den iCloud-Link von deinem Coach nutzen und dort den Schlüssel einfügen.</li>`}
+        <li>In TikTok oder Instagram: <b>Teilen → Mehr → Hear Me Coach</b>. Fertig, das Video ist im Pool.</li></ol>
+      <details><summary class="link">Anleitung: Kurzbefehl selbst anlegen</summary>
+        <ol class="steps small">
+          <li>App <b>Kurzbefehle</b> öffnen, <b>+</b> tippen, Name: <b>Hear Me Coach</b>.</li>
+          <li>Oben auf den Namen → <b>Details</b> → <b>Im Share-Sheet anzeigen</b> einschalten. Eingabe: <b>URLs</b> und <b>Text</b>.</li>
+          <li>Aktion <b>Inhalte von URL abrufen</b> hinzufügen. URL:<div class="keybox">${esc(CFG.url)}/rest/v1/rpc/share_link</div>
+            Methode <b>POST</b>. Header: <b>apikey</b> = <span class="keybox" style="display:block">${esc(CFG.key)}</span> und <b>Content-Type</b> = <b>application/json</b>.
+            Anfragetext <b>JSON</b>: Feld <b>p_key</b> = dein Teilen-Schlüssel, Feld <b>p_text</b> = <b>Kurzbefehleingabe</b>.</li>
+          <li>Aktion <b>Wörterbuchwert abrufen</b>: Schlüssel <b>message</b>. Danach <b>Mitteilung anzeigen</b> mit dem Wörterbuchwert.</li>
+          <li>Fertig. Zum Weitergeben: Kurzbefehl teilen → <b>iCloud-Link kopieren</b>. Vorher beim Feld p_key „Beim Import fragen“ einstellen, dann fragt der Kurzbefehl jeden nach seinem eigenen Schlüssel.</li></ol></details></section>`;
+  return `${invite}${access}${coachBox}${IS_ANDROID ? '' : shortcut}
     <section class="card"><h2 style="font-size:26px">So speicherst du ein Video</h2>
-      <p><b>Android:</b> Diese Seite über das Browser-Menü „Zum Startbildschirm hinzufügen“ installieren. Danach in TikTok oder Instagram auf <i>Teilen</i> tippen und <b>Hear Me Coach</b> wählen.</p>
-      <p><b>iPhone und alle anderen:</b> Im Video <i>Teilen → Link kopieren</i>, dann hier „${solo ? '+ Video speichern' : '+ Link teilen'}“ und einfügen.</p>
+      <p><b>Android:</b> App installieren (Chrome-Menü ⋮ → „App installieren“). Danach in TikTok oder Instagram auf <i>Teilen</i> tippen und <b>Hear Me Coach</b> wählen.</p>
+      <p><b>iPhone:</b> Kurzbefehl „Hear Me Coach“ nutzen (siehe oben) oder im Video <i>Teilen → Link kopieren</i> und hier „${solo ? '+ Video speichern' : '+ Link teilen'}“ antippen. Dort auf „Einfügen“ tippen.</p>
       ${solo ? '' : '<p class="small">Anonym geteilte Links zeigen Mitspielern keinen Namen. Der Coach sieht immer, wer etwas geteilt hat.</p>'}</section>
     <section class="card"><button class="btn alt" id="leave">${solo ? 'Sammlung löschen' : 'Mannschaft verlassen'}</button>
       <p class="small">${solo ? 'Löscht dein Profil, deine Videos und deine Statistik.' : 'Löscht dein Profil und deine geteilten Links.'}</p></section>`;
@@ -621,9 +651,21 @@ function bindTeam(){
     document.querySelectorAll('[data-delcat]').forEach(b => b.onclick = async () => {
       try { await api.call('delete_category', {p_token:token(), p_name:b.dataset.delcat}); await load(); } catch (e) { toast(e.message); } });
   }
+  const cm = $('#cpMyCode'); if (cm) cm.onclick = async () => { try { await navigator.clipboard.writeText(store.get('login_code')); toast('Code kopiert'); } catch { toast(store.get('login_code')); } };
+  $('#newCode').onclick = () => confirmSheet('Neuen Zugangscode erzeugen?', 'Der bisherige Code funktioniert danach nicht mehr. Angemeldete Geräte bleiben angemeldet.', 'Erzeugen', async () => {
+    const c = await api.call('new_login_code', {p_token:token()}); showCodeSheet(c, false); return 'keep'; });
+  $('#logoutBtn').onclick = () => confirmSheet('Auf diesem Gerät abmelden?', store.get('login_code') ? `Zum Wiederanmelden brauchst du deinen Zugangscode: ${store.get('login_code')}` : 'Zum Wiederanmelden brauchst du deinen Zugangscode. Erzeuge vorher einen, falls du ihn nicht hast.', 'Abmelden', async () => {
+    if (demo) { demoHooks.fresh(); return; }
+    await api.call('logout', {p_token:token()}).catch(() => {}); store.del('token'); S.me = null; render(); });
+  const mk = $('#mkKey'); if (mk) mk.onclick = async () => {
+    try { const k = await api.call('new_share_key', {p_token:token()});
+      $('#keyOut').innerHTML = `<div class="keybox">${esc(k)}</div><div class="row"><button class="btn acc" id="cpKey">Schlüssel kopieren</button></div>
+        <p class="small">Gilt nur zum Teilen. Ein neuer Schlüssel ersetzt den alten.</p>`;
+      $('#cpKey').onclick = async () => { try { await navigator.clipboard.writeText(k); toast('Schlüssel kopiert'); } catch { toast(k); } };
+    } catch (e) { toast(e.message); } };
   $('#leave').onclick = () => confirmSheet('Mannschaft verlassen?', 'Dein Profil und alle deine geteilten Links werden gelöscht.', 'Verlassen', async () => {
     if (demo) { demoHooks.fresh(); return; }
-    await api.call('leave_team', {p_token:token()}); store.del('token'); S.me = null; render(); });
+    await api.call('leave_team', {p_token:token()}); store.del('token'); store.del('login_code'); S.me = null; render(); });
 }
 
 // ---------- sheets ----------
@@ -634,7 +676,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSheet()
 
 function confirmSheet(title, text, label, fn){
   sheet(`<h2>${esc(title)}</h2><p>${esc(text)}</p><div class="row"><button class="btn acc" id="ok">${esc(label)}</button><button class="btn alt" data-close>Abbrechen</button></div>`);
-  $('#ok').onclick = async () => { try { await fn(); closeSheet(); } catch (e) { toast(e.message); } };
+  $('#ok').onclick = async () => { try { if (await fn() !== 'keep') closeSheet(); } catch (e) { toast(e.message); } };
 }
 
 function openShare(prefill){
@@ -642,7 +684,8 @@ function openShare(prefill){
   sheet(`<h2>${solo ? 'Video speichern' : 'Hear me, Coach!'}</h2>
     <form id="shareForm">
       <label for="u">Link zum Video</label>
-      <input id="u" type="url" inputmode="url" placeholder="https://www.tiktok.com/…" value="${esc(prefill)}" required>
+      <div class="row" style="flex-wrap:nowrap"><input id="u" type="url" inputmode="url" placeholder="https://www.tiktok.com/…" value="${esc(prefill)}" required style="flex:1">
+        ${navigator.clipboard && navigator.clipboard.readText ? '<button type="button" class="btn" id="pasteBtn">Einfügen</button>' : ''}</div>
       <p class="small" id="pv"></p>
       <label for="ti">Titel <span class="small">(was ist zu sehen?)</span></label>
       <input id="ti" type="text" maxlength="200" placeholder="${solo ? 'z. B. Kniebeuge mit Pause' : 'z. B. Passübung im Dreieck'}">
@@ -660,7 +703,10 @@ function openShare(prefill){
     pv = await preview(u); if (pv.title && !$('#ti').value) $('#ti').value = pv.title.slice(0, 200);
   };
   $('#u').addEventListener('change', check); $('#u').addEventListener('paste', () => setTimeout(check, 0));
-  if (prefill) check(); else setTimeout(() => $('#u').focus(), 50);
+  const pb = $('#pasteBtn'); if (pb) pb.onclick = async () => {
+    try { const t = firstUrl(await navigator.clipboard.readText()); if (!t) return toast('In der Zwischenablage ist kein Link.'); $('#u').value = t; check(); }
+    catch { toast('Bitte lange ins Feld tippen und „Einfügen“ wählen.'); } };
+  if (prefill) check(); else if (!pb) setTimeout(() => $('#u').focus(), 50);
   $('#shareForm').onsubmit = async e => {
     e.preventDefault();
     const u = firstUrl($('#u').value); if (!u) return toast(ERR.invalid_url);
@@ -720,6 +766,12 @@ function onboarding(){
           <circle cx="445" cy="75" r="26" fill="#f3f7f1"/><text x="445" y="83" fill="#0b4d33">C</text><text x="445" y="132" fill="#f3f7f1">Coach</text>
           <circle cx="585" cy="75" r="30" fill="#ff5a3c"/><text x="585" y="83" fill="#fff">✓</text><text x="585" y="132" fill="#f3f7f1">Training</text></g>
       </svg></section>
+    ${installBanner()}
+    <section class="card" id="loginCard"><h2 style="font-size:26px">Schon dabei? Anmelden</h2>
+      <form id="loginForm"><label for="lc">Dein Zugangscode</label>
+        <input id="lc" type="text" autocapitalize="characters" autocomplete="off" spellcheck="false" placeholder="XXXX-XXXX-XXXX" maxlength="20" required>
+        <div class="row" style="margin-top:14px"><button class="btn acc">Anmelden</button></div></form>
+      <p class="small">Den Code hast du beim ersten Beitreten bekommen. In der App findest du ihn unter „Team“ bzw. „Einstellungen“.</p></section>
     <section class="card"><h2 style="font-size:26px">Mannschaft beitreten</h2>
       <form id="joinForm"><label for="jc">Code vom Coach</label><input id="jc" type="text" autocapitalize="characters" autocomplete="off" required maxlength="12">
         <label for="jn">Dein Name</label><input id="jn" type="text" maxlength="40" required autocomplete="given-name">
@@ -735,11 +787,14 @@ function onboarding(){
       <form id="soloForm"><label for="sn">Dein Name</label><input id="sn" type="text" maxlength="40" required>
         <label for="ssp">Sportart</label>${sportPicker('Kraftsport', 'ssp')}
         <div class="row" style="margin-top:14px"><button class="btn">Sammlung starten</button></div></form></section>
-    <p class="small">Beta: Es gibt kein Passwort. Der Zugang ist in diesem Browser gespeichert.</p></main>`;
+    <p class="small">Kein Passwort nötig: Nach dem Beitreten bekommst du einen persönlichen Zugangscode, mit dem du dich auf jedem Gerät wieder anmeldest.</p></main>`;
 }
 function bindOnboarding(){
   const done = r => { if (!demo) store.set('token', r.token); S.tab = r.team.mode === 'solo' ? 'all' : r.role === 'coach' ? 'coach' : 'pool';
-    demoHooks.refresh(); load().then(handleShare); };
+    demoHooks.refresh(); load().then(() => { if (r.login_code) showCodeSheet(r.login_code, true); else handleShare(); }); };
+  $('#loginForm').onsubmit = async e => { e.preventDefault();
+    try { const r = await api.call('login_with_code', {p_code:$('#lc').value}); toast('Willkommen zurück, ' + r.name + '!'); done(r); } catch (err) { toast(err.message); } };
+  $('#lc').oninput = e => { const p = e.target.selectionStart === e.target.value.length; e.target.value = fmtCode(e.target.value).slice(0, 14); };
   $('#joinForm').onsubmit = async e => { e.preventDefault();
     try { done(await api.call('join_team', {p_code:$('#jc').value, p_name:$('#jn').value})); } catch (err) { toast(err.message); } };
   const sport = bindSportPicker();
@@ -751,6 +806,42 @@ function bindOnboarding(){
     if (!ssport()) return toast('Bitte eine Sportart eingeben.');
     try { done(await api.call('create_team', {p_team_name:'Mein Training', p_coach_name:$('#sn').value, p_sport:ssport(), p_mode:'solo'})); } catch (err) { toast(err.message); } };
   const code = new URLSearchParams(location.search).get('code'); if (code) $('#jc').value = code;
+  if (STANDALONE && !code) setTimeout(() => $('#lc').focus(), 100);
+  bindInstall();
+}
+
+// ---------- install + access code helpers ----------
+const IS_IOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const IS_ANDROID = /android/i.test(navigator.userAgent);
+const STANDALONE = matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+let installEvt = null;
+addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; if (S.me) render(); });
+const SHORTCUT_URL = ''; // iCloud link of the shared iPhone shortcut, once created
+const fmtCode = c => (c || '').toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/(.{4})(?=.)/g, '$1-');
+function installBanner(){
+  if (STANDALONE || demo || store.get('hideInstall') || !(IS_IOS || IS_ANDROID)) return '';
+  return `<section class="card install"><h3>Als App installieren</h3>
+    ${IS_IOS ? `<ol><li>Unten in Safari auf <b>Teilen</b> <svg viewBox="0 0 24 24" class="ico"><path d="M12 3v12M7 8l5-5 5 5M5 12v8h14v-8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> tippen.</li>
+        <li>Nach unten scrollen: <b>Zum Home-Bildschirm</b>.</li>
+        <li>Die App vom Home-Bildschirm öffnen und dort mit deinem <b>Zugangscode</b> anmelden${store.get('login_code') ? `: <b class="nowrap">${esc(store.get('login_code'))}</b>` : ''}.</li></ol>
+        <p class="small">Wichtig: Die App auf dem Home-Bildschirm ist auf dem iPhone von Safari getrennt. Darum brauchst du dort einmal den Zugangscode.</p>`
+      : installEvt ? `<p>Ein Tipp, dann ist Hear Me Coach im Teilen-Menü von TikTok und Instagram.</p><div class="row"><button class="btn acc" id="doInstall">Jetzt installieren</button></div>`
+      : `<p>Im Chrome-Menü <b>⋮</b> auf <b>App installieren</b> oder <b>Zum Startbildschirm hinzufügen</b> tippen. Danach ist Hear Me Coach im Teilen-Menü von TikTok und Instagram.</p>`}
+    <div class="row" style="margin-top:8px"><button class="btn alt" id="hideInstall">Ausblenden</button></div></section>`;
+}
+function bindInstall(){
+  const d = $('#doInstall'); if (d) d.onclick = async () => { installEvt.prompt(); await installEvt.userChoice.catch(() => {}); installEvt = null; render(); };
+  const h = $('#hideInstall'); if (h) h.onclick = () => { store.set('hideInstall', true); render(); };
+}
+function showCodeSheet(code, first){
+  if (!demo) store.set('login_code', code);
+  if (S.me) render();
+  sheet(`<h2>${first ? 'Dein persönlicher Zugangscode' : 'Neuer Zugangscode'}</h2>
+    <p>Damit meldest du dich auf jedem Gerät wieder an, zum Beispiel in der installierten App oder auf einem neuen Handy.</p>
+    <div class="code" style="font-size:clamp(26px,8vw,38px);margin:10px 0">${esc(code)}</div>
+    <div class="row"><button class="btn acc" id="cpCode">Code kopieren</button><button class="btn alt" data-close>Weiter</button></div>
+    <p class="small" style="margin-top:12px">Tipp: Mach ein Bildschirmfoto oder speichere den Code in deinen Notizen. Gib ihn nicht weiter, er ist wie ein Passwort.</p>`);
+  $('#cpCode').onclick = async () => { try { await navigator.clipboard.writeText(code); toast('Code kopiert'); } catch { toast('Bitte abschreiben: ' + code); } };
 }
 
 // ---------- share target ----------
