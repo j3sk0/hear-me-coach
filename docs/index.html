@@ -117,6 +117,9 @@ textarea{min-height:80px;resize:vertical}
 .pickrow input[type=checkbox]{width:22px;height:22px;accent-color:var(--bg)}.pickrow input[type=number]{min-height:38px;padding:6px 8px}
 .toggles .switch{margin-top:8px;font-weight:500}
 .install{border:2px solid var(--acc)}
+.dhead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:14px}.dhead select{width:auto;max-width:55%}
+.dstats{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:14px;color:var(--soft);font-weight:600}.dstats .good{color:var(--ok)}
+.rank{font-family:"Barlow Condensed";font-weight:700;font-size:18px;color:var(--ink)}
 .mlist{list-style:none;margin:8px 0 0;padding:0}.mlist li{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;padding:10px 0;border-top:1px solid var(--line)}
 .mlist li.dup{background:var(--acc2);border-radius:10px;padding:10px}.btn.sm{min-height:36px;padding:0 10px;font-size:14px}
 .warn{color:var(--acc);font-weight:600}.warnline{color:var(--acc);font-weight:600}
@@ -335,6 +338,24 @@ function makeDemo(kind){
         case 'rate_session': { const x = sessions.find(q => q.id === a.p_id); if (!x || x.t > Date.now()) throw new Error('Bewerten geht erst ab Trainingsbeginn.');
           x.ratings[me] = [a.p_stars, a.p_comment || null]; return null; }
         case 'team_preview': return null;
+        case 'discover_sports': return [{sport:team.sport, teams:4}, {sport:'Fußball', teams:12}, {sport:'Handball', teams:3}];
+        case 'set_share_discover': if (!coach) throw new Error(ERR.coach_only); team.share_discover = a.p_on; return null;
+        case 'discover': { const sp = a.p_sport || team.sport;
+          const base = sp === 'Fußball' ? [
+            ['https://www.tiktok.com/@drills/video/91','tiktok','Rondo 6 gegen 2 mit zwei Kontakten','Aufwärmen',34,6,5,61,4.6],
+            ['https://www.instagram.com/reel/fb2','instagram','Pressing nach Ballverlust in 5 Sekunden','Taktik',21,4,3,18,4.2],
+            ['https://www.youtube.com/shorts/fb3','youtube','Torabschluss nach Doppelpass','Abschluss',17,5,1,9,4.0],
+            ['https://www.tiktok.com/@kicker/video/4','tiktok','Koordinationsleiter mit Ball','Technik',9,2,2,22,null]]
+            : sp === 'Handball' ? [['https://www.tiktok.com/@hb/video/1','tiktok','Sprungwurf aus dem Rückraum','Abschluss',12,3,2,8,4.5]]
+            : [...posts.filter(p => p.votes.length || p.status === 'adopted').map(p => [p.url, p.platform, p.title, p.category, p.votes.length + 7, 3, p.status === 'adopted' ? 2 : 0, 5, p.review && p.review.stars || null, true]),
+               ['https://www.tiktok.com/@vb/video/9','tiktok','Blockarbeit gegen Diagonalangriff','Taktik',19,4,3,14,4.4],
+               ['https://www.instagram.com/reel/vb10','instagram','Aufschlag-Annahme im Dreieck','Technik',11,3,1,6,null]];
+          let r = base.map(([url, platform, title, category, upvotes, teams, adopted_teams, done, coach_stars, mine]) =>
+            ({url, platform, title, category, upvotes, teams, adopted_teams, done, coach_stars, thumbnail_url:null, in_my_team:!!mine, last_shared:new Date().toISOString()}));
+          if (a.p_sort === 'training') r.sort((x, y) => (y.adopted_teams * 10 + y.done) - (x.adopted_teams * 10 + x.done));
+          else if (a.p_sort === 'new') r.reverse(); else r.sort((x, y) => (y.upvotes + y.adopted_teams * 3) - (x.upvotes + x.adopted_teams * 3));
+          if (a.p_days === 7) r = r.slice(0, Math.max(1, r.length - 2));
+          return r; }
         case 'rename_me': { const v = a.p_name.trim(); if (!v) throw new Error(ERR.invalid_name);
           if (members.some(x => x.id !== me && x.name.trim().toLowerCase() === v.toLowerCase())) throw new Error(ERR.name_taken);
           members.find(x => x.id === me).name = v; demoHooks.refresh(); return null; }
@@ -480,6 +501,10 @@ async function load(){
     S.me = await api.call('whoami', {p_token:token()});
     S.posts = await api.call('list_posts', {p_token:token()});
     if (S.tab === 'stats') S.log = await api.call('list_my_log', {p_token:token()});
+    if (S.tab === 'discover') {
+      if (!S.discSports) S.discSports = await api.call('discover_sports', {p_token:token()}).catch(() => []);
+      S.disc = await api.call('discover', {p_token:token(), p_sport:S.discSport || null, p_days:S.discDays === undefined ? 30 : S.discDays, p_sort:S.discSort || 'popular'});
+    }
     if (S.tab === 'training' && S.me.team.mode === 'team') S.sessions = await api.call('list_sessions', {p_token:token()});
     if (S.tab === 'team' && S.me.team.mode === 'team' && !demo) S.prefs = await api.call('get_notify_prefs', {p_token:token()}).catch(() => null);
     if (S.tab === 'team' && S.me.team.mode === 'team' && S.me.role === 'coach') S.members = await api.call('list_members', {p_token:token()}).catch(() => null);
@@ -511,8 +536,8 @@ function render(){
   const coach = S.me.role === 'coach', solo = isSolo(), theme = applyTheme(S.me.team);
   const relevantOpen = S.posts.filter(p => p.status === 'relevant').length;
   const tabs = solo
-    ? [['all','Sammlung'], ['fav','Favoriten'], ['stats','Statistik'], ['team','Einstellungen']]
-    : [['pool','Pool'], ...(coach ? [['coach','Coach', relevantOpen]] : []), ['training','Training'], ['mine','Meine'], ['stats','Statistik'], ['team','Team']];
+    ? [['all','Sammlung'], ['fav','Favoriten'], ['discover','Entdecken'], ['stats','Statistik'], ['team','Einstellungen']]
+    : [['pool','Pool'], ...(coach ? [['coach','Coach', relevantOpen]] : []), ['training','Training'], ['discover','Entdecken'], ['mine','Meine'], ['stats','Statistik'], ['team','Team']];
   if (!tabs.some(t => t[0] === S.tab)) S.tab = tabs[0][0];
   let list = S.posts, hint = '';
   if (S.tab === 'all') { list = S.posts.filter(p => p.status !== 'rejected'); hint = 'Deine Übungen. Bewerte sie mit Sternen und tippe nach dem Training auf „Gemacht“.'; }
@@ -532,7 +557,7 @@ function render(){
       ${usedCats.map(c => `<button class="pick" data-f="${esc(c)}" aria-pressed="${S.cat === c}">${esc(c)}</button>`).join('')}</div>` : '';
   const sorter = solo ? `<div class="row" style="margin:0 0 12px"><label for="sort" class="small" style="margin:0">Sortieren</label>
       <select id="sort" style="width:auto;flex:1">${Object.entries(SORTS).map(([k,l]) => `<option value="${k}" ${k === (S.sort || 'new') ? 'selected' : ''}>${l}</option>`).join('')}</select></div>` : '';
-  const body = S.tab === 'team' ? '<div class="tgrid">' + teamView(coach) + '</div>' : S.tab === 'stats' ? statsView()
+  const body = S.tab === 'team' ? '<div class="tgrid">' + teamView(coach) + '</div>' : S.tab === 'stats' ? statsView() : S.tab === 'discover' ? discoverView()
     : `${S.tab === 'training' && !solo ? sessionsBlock(coach) + '<h2 style="font-size:24px;margin:22px 2px 0">Übungen</h2>' : ''}<p class="hint">${esc(hint)}</p>${filters}${sorter}${list.length ? '<div class="grid">' + list.map(postCard).join('') + '</div>' : emptyView()}`;
   app.innerHTML = `
     <header class="top">${motifSvg(theme.motif)}
@@ -543,12 +568,12 @@ function render(){
     <main>${codeBanner()}${S.tab === 'team' || S.tab === 'stats' ? '' : installBanner()}${body}</main>
     <button class="fab" id="fab">${solo ? '+ Video speichern' : '+ Link teilen'}</button>`;
   app.querySelectorAll('[data-tab]').forEach(b => b.onclick = async () => { S.tab = b.dataset.tab; S.cat = '';
-    if (S.tab === 'stats' || S.tab === 'training' || S.tab === 'team') return load().then(() => scrollTo(0, 0));
+    if (S.tab === 'stats' || S.tab === 'training' || S.tab === 'team' || S.tab === 'discover') return load().then(() => scrollTo(0, 0));
     render(); scrollTo(0,0); });
   app.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { S.cat = b.dataset.f; render(); });
   const so = $('#sort'); if (so) so.onchange = () => { S.sort = so.value; render(); };
   $('#fab').onclick = () => openShare('');
-  bindPosts(); bindMode(); bindInstall(); if (S.tab === 'training') bindSessions(); if (S.tab === 'team') bindTeam();
+  bindPosts(); bindMode(); bindInstall(); if (S.tab === 'training') bindSessions(); if (S.tab === 'discover') bindDiscover(); if (S.tab === 'team') bindTeam();
 }
 
 function emptyView(){
@@ -701,6 +726,45 @@ function openRateSession(s){
     try { await api.call('rate_session', {p_token:token(), p_id:s.id, p_stars:stars, p_comment:$('#rs_c').value}); closeSheet(); toast('Danke für dein Feedback!'); await load(); } catch (e) { toast(e.message); } };
 }
 
+// ---------- discover: popular across all teams of a sport (aggregates only) ----------
+function discoverView(){
+  const sport = S.discSport || S.me.team.sport, days = S.discDays === undefined ? 30 : S.discDays, sort = S.discSort || 'popular', solo = isSolo();
+  const sports = [...new Set([S.me.team.sport, ...(S.discSports || []).map(x => x.sport)])];
+  const chip = (attr, val, cur, label) => `<button class="pick" ${attr}="${val}" aria-pressed="${String(val) === String(cur)}">${label}</button>`;
+  const list = S.disc || [];
+  return `<div class="dhead"><h2 style="font-size:26px">Entdecken</h2>
+      <select id="dSport" aria-label="Sportart">${sports.map(x => `<option ${x === sport ? 'selected' : ''}>${esc(x)}</option>`).join('')}</select></div>
+    <p class="hint" style="margin-top:4px">Was andere Mannschaften in ${esc(sport)} gerade feiern und trainieren. Nur Zahlen, keine Namen.</p>
+    <div class="filters">${chip('data-ds', 'popular', sort, 'Beliebt')}${chip('data-ds', 'training', sort, 'Im Training')}${chip('data-ds', 'new', sort, 'Neu')}
+      <span style="width:10px"></span>${chip('data-dd', 7, days, '7 Tage')}${chip('data-dd', 30, days, '30 Tage')}${chip('data-dd', 'all', days === null ? 'all' : days, 'Immer')}</div>
+    ${list.length ? '<div class="grid">' + list.map((v, i) => discCard(v, i, solo)).join('') + '</div>'
+      : `<div class="empty"><h2>Noch nichts zu sehen</h2><p>Sobald in ${esc(sport)} Videos geteilt und gevotet werden, erscheinen sie hier. Je mehr Mannschaften mitmachen, desto besser die Übersicht.</p></div>`}`;
+}
+function discCard(v, i, solo){
+  const stats = [v.upvotes ? `<span title="Upvotes insgesamt">▲ ${v.upvotes}</span>` : '',
+    v.teams > 1 ? `<span>in ${v.teams} Teams</span>` : '<span>1 Team</span>',
+    v.adopted_teams ? `<span class="good">${v.adopted_teams}× im Training</span>` : '',
+    v.done ? `<span>✓ ${v.done}× gemacht</span>` : '', v.coach_stars ? `<span>Coach ★ ${String(v.coach_stars).replace('.', ',')}</span>` : ''].filter(Boolean).join('');
+  return `<article class="card post disc">
+    <a class="thumb p-${esc(v.platform)}" href="${esc(v.url)}" target="_blank" rel="noopener" aria-label="Video öffnen">
+      ${v.thumbnail_url ? `<img src="${esc(v.thumbnail_url)}" alt="" loading="lazy" referrerpolicy="no-referrer">` : '▶'}<span class="pl">${esc(PL[v.platform] || 'Link')}</span></a>
+    <div><div class="meta"><span class="rank">#${i + 1}</span>${v.category ? `<span class="cat">${esc(v.category)}</span>` : ''}${v.in_my_team ? '<span class="chip s-adopted">Schon bei euch</span>' : ''}</div>
+      <div class="title">${esc(v.title || PL[v.platform] + '-Video')}</div>
+      <div class="dstats">${stats}</div>
+      <div class="row" style="margin-top:10px">${v.in_my_team ? '' : `<button class="btn" data-take="${i}">${solo ? 'In meine Sammlung' : 'In unseren Pool'}</button>`}
+        <a class="link small" href="${esc(v.url)}" target="_blank" rel="noopener">In ${esc(PL[v.platform] || 'Browser')} öffnen</a></div></div></article>`;
+}
+function bindDiscover(){
+  const sel = $('#dSport'); if (sel) sel.onchange = () => { S.discSport = sel.value === S.me.team.sport ? null : sel.value; load(); };
+  document.querySelectorAll('[data-ds]').forEach(b => b.onclick = () => { S.discSort = b.dataset.ds; load(); });
+  document.querySelectorAll('[data-dd]').forEach(b => b.onclick = () => { S.discDays = b.dataset.dd === 'all' ? null : +b.dataset.dd; load(); });
+  document.querySelectorAll('[data-take]').forEach(b => b.onclick = async () => {
+    const v = S.disc[+b.dataset.take];
+    try { const r = await api.call('add_post', {p_token:token(), p_url:v.url, p_title:v.title, p_thumbnail_url:v.thumbnail_url, p_comment:null, p_anonymous:false, p_category:v.category});
+      toast(r.duplicate ? 'Ist schon bei euch.' : isSolo() ? 'In deiner Sammlung gespeichert.' : 'Im Pool! Jetzt können alle upvoten.'); await load(); }
+    catch (e) { toast(e.message); } });
+}
+
 // ---------- statistics (computed from my own log) ----------
 function weekStart(t){ const d = new Date(t); d.setHours(0,0,0,0); d.setDate(d.getDate() - ((d.getDay() + 6) % 7)); return d.getTime(); }
 function statsView(){
@@ -749,7 +813,9 @@ function teamView(coach){
   const coachBox = !coach ? '' : `<section class="card"><h2 style="font-size:26px">${solo ? 'Sammlung' : 'Coach-Einstellungen'}</h2>
       ${solo ? '' : `<p class="small">Co-Trainer-Code (nur an Trainer geben):</p><div class="code">${esc(t.coach_code)}</div>
       <label for="th">Upvotes bis zum Coach</label>
-      <div class="row"><input id="th" type="number" min="1" max="100" value="${t.threshold}" style="max-width:120px"><button class="btn" id="saveTh">Speichern</button></div>`}
+      <div class="row"><input id="th" type="number" min="1" max="100" value="${t.threshold}" style="max-width:120px"><button class="btn" id="saveTh">Speichern</button></div>
+      <label class="switch"><input type="checkbox" id="shareDisc" ${t.share_discover !== false ? 'checked' : ''}> Unsere Videos anonym in „Entdecken“ zeigen</label>
+      <p class="small">Andere Mannschaften derselben Sportart sehen dann nur Link, Titel, Kategorie und Zahlen (Upvotes, im Training), keine Namen, Kommentare oder Notizen.</p>`}
       <label for="tn2">${solo ? 'Name der Sammlung' : 'Mannschaft'}</label><input id="tn2" type="text" maxlength="80" value="${esc(t.name)}">
       <label for="sp">Sportart</label>${sportPicker(t.sport)}
       <div class="row" style="margin-top:10px"><button class="btn" id="saveTeam">Speichern</button></div></section>
@@ -864,6 +930,7 @@ function bindTeam(){
     document.querySelectorAll('[data-delcat]').forEach(b => b.onclick = async () => {
       try { await api.call('delete_category', {p_token:token(), p_name:b.dataset.delcat}); await load(); } catch (e) { toast(e.message); } });
   }
+  const sd = $('#shareDisc'); if (sd) sd.onchange = async () => { try { await api.call('set_share_discover', {p_token:token(), p_on:sd.checked}); toast(sd.checked ? 'Ihr seid in „Entdecken“ dabei.' : 'Eure Videos erscheinen nicht mehr in „Entdecken“.'); } catch (e) { sd.checked = !sd.checked; toast(e.message); } };
   $('#saveName').onclick = async () => { const v = $('#myName').value.trim(); if (!v || v === S.me.name) return;
     try { await api.call('rename_me', {p_token:token(), p_name:v}); toast('Name geändert'); await load(); } catch (e) { toast(e.message); } };
   const cm = $('#cpMyCode'); if (cm) cm.onclick = async () => { try { await navigator.clipboard.writeText(store.get('login_code')); toast('Code kopiert'); } catch { toast(store.get('login_code')); } };

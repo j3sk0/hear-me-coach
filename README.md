@@ -41,6 +41,13 @@ Spieler finden Trainingsvideos auf TikTok, Instagram oder YouTube und teilen sie
 - Neues Video, Upvotes (gebündelt über 10 Minuten), Videos mit genug Upvotes (Coach, gebündelt), Video ins Training aufgenommen, neuer Trainingsplan, Erinnerung zur Bewertung nach dem Training, Ergebnis 24 Stunden später
 - Jede Art einzeln abschaltbar, Nachtruhe 22–7 Uhr
 
+### Entdecken (mannschaftsübergreifend)
+- Pro Sportart: welche Videos über alle Mannschaften gerade die meisten Upvotes haben und welche wirklich ins Training übernommen werden. Sortierung Beliebt / Im Training / Neu, Zeitraum 7 Tage / 30 Tage / immer.
+- Gleiche Videos aus verschiedenen Mannschaften werden zusammengefasst (normalisierter Link).
+- Gezeigt werden nur Link, Titel, Kategorie und Zahlen (Upvotes, Anzahl Teams, im Training, gemacht, Coach-Sterne). Keine Namen, Kommentare, Notizen oder Mannschaftsnamen.
+- Ein Tipp übernimmt ein Video in den eigenen Pool bzw. die eigene Sammlung.
+- Mannschaften sind standardmäßig dabei; der Coach kann das unter „Team“ abschalten.
+
 ## Aufbau
 
 ```
@@ -50,7 +57,7 @@ mobile/                   Native App (Expo SDK 58): WebView auf die Web-App + Te
   app.json / app.config.js  App-Konfiguration, Teilen-Erweiterung, Icons
   plugins/                eigener Config-Plugin (Name der iOS-Teilen-Erweiterung)
   eas.json                Build-Profile (preview = APK, production = Stores)
-supabase/migrations/      Datenbank-Schema und Funktionen in Reihenfolge 0001–0011
+supabase/migrations/      Datenbank-Schema und Funktionen in Reihenfolge 0001–0012
 .github/workflows/        „App bauen“ (Expo-Cloud) und „Datenbank wach halten“ (alle 3 Tage)
 SPEC.md                   Lastenheft
 ANLEITUNG-APP.md          Konten anlegen, App bauen, verteilen
@@ -75,6 +82,7 @@ Die native App lädt die Web-App. Änderungen an der Web-App sind deshalb sofort
 | Coach | `list_members`, `merge_members`, `remove_member`, `review_post`, `rate_post`, `set_threshold`, `set_team`, `set_team_style`, `add_category`, `delete_category` |
 | Training | `list_sessions`, `save_session`, `publish_session`, `delete_session`, `rate_session`, `log_workout`, `undo_workout`, `list_my_log` |
 | Teilen per Schlüssel | `new_share_key`, `share_link` |
+| Entdecken | `discover`, `discover_sports`, `set_share_discover` |
 | Benachrichtigungen | `register_push`, `unregister_push`, `get_notify_prefs`, `set_notify_prefs` |
 
 **Benachrichtigungen intern:** Trigger auf `post`, `upvote` und `training_session` schreiben in `notification_outbox`. Ein `pg_cron`-Job (`hmc-send-push`, jede Minute) erzeugt Erinnerungen und Ergebnisse, beachtet Einstellungen und Nachtruhe und schickt fällige Nachrichten per `pg_net` an den Expo-Push-Dienst.
