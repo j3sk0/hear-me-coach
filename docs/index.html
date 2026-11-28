@@ -107,6 +107,15 @@ textarea{min-height:80px;resize:vertical}
 .hero h1{font-size:clamp(40px,10vw,56px)}
 .hero p{font-size:18px;opacity:.9;max-width:34em}
 .board{display:block;width:100%;height:auto;margin:10px 0 6px}
+.sess h3{font-size:24px;margin:4px 0 2px}.sess .when{font-weight:600;color:var(--soft)}
+.sess.draft{border-style:dashed}.sess .items{margin:10px 0 6px;padding-left:1.3em}.sess .items li{margin:6px 0}
+.rate{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px;padding-top:10px;border-top:1px dashed var(--line)}
+.rate b{font-family:"Barlow Condensed";font-size:28px}.srow{color:#f5a623;letter-spacing:1px}.srow span{color:var(--line)}
+.cmts{margin:6px 0;padding-left:1.2em}
+.pickl{display:flex;flex-direction:column;gap:6px;max-height:280px;overflow:auto;border:1.5px solid var(--line);border-radius:12px;padding:6px}
+.pickrow{display:grid;grid-template-columns:28px minmax(0,1fr) 78px;align-items:center;gap:8px;margin:0;font-weight:500;padding:4px}
+.pickrow input[type=checkbox]{width:22px;height:22px;accent-color:var(--bg)}.pickrow input[type=number]{min-height:38px;padding:6px 8px}
+.toggles .switch{margin-top:8px;font-weight:500}
 .install{border:2px solid var(--acc)}.install h3{font-size:22px;margin-bottom:6px}.install ol{margin:6px 0;padding-left:1.3em}.install li{margin:4px 0}
 .ico{width:18px;height:18px;vertical-align:-3px}.nowrap{white-space:nowrap}
 .steps{margin:6px 0;padding-left:1.3em}.steps li{margin:6px 0}
@@ -159,7 +168,7 @@ const store = {
   set(k,v){ try { localStorage.setItem('hmc_'+k, JSON.stringify(v)); } catch {} },
   del(k){ try { localStorage.removeItem('hmc_'+k); } catch {} }
 };
-const ERR = {invalid_code:'Code nicht gefunden.', not_authorized:'Bitte neu anmelden.', invalid_login:'Zugangscode nicht gefunden. Bitte genau prüfen.', invalid_key:'Teilen-Schlüssel ungültig.', invalid_url:'Das sieht nicht wie ein Link aus.',
+const ERR = {not_ratable:'Bewerten geht erst ab Trainingsbeginn.', invalid_code:'Code nicht gefunden.', not_authorized:'Bitte neu anmelden.', invalid_login:'Zugangscode nicht gefunden. Bitte genau prüfen.', invalid_key:'Teilen-Schlüssel ungültig.', invalid_url:'Das sieht nicht wie ein Link aus.',
   own_post:'Eigene Beiträge kannst du nicht upvoten.', coach_only:'Nur für den Coach.', not_allowed:'Das darfst du nicht.', not_found:'Beitrag nicht gefunden.'};
 const STATUS = {new:'Neu', relevant:'Beim Coach', seen:'Angeschaut', adopted:'Ins Training aufgenommen', rejected:'Abgelehnt'};
 const PL = {tiktok:'TikTok', instagram:'Instagram', youtube:'YouTube', facebook:'Facebook', web:'Link'};
@@ -202,6 +211,12 @@ function makeDemo(kind){
     {id:'p4', url:'https://www.tiktok.com/@athletik/video/2', platform:'tiktok', title:'Sprungkraft-Zirkel ohne Geräte', category:'Kondition', comment:'Für die Vorbereitung', anonymous:true, by:'e', status:'new', t:now-2*h, votes:[]}];
   // seeded workout log: a believable rhythm over the last ~10 weeks
   let logs = [];
+  let sessions = (fresh || solo) ? [] : [
+    {id:'s1', title:'Annahme und Block', t:now - 2*d - 2*h, duration_min:90, place:'Halle 2', note:'Knieschoner nicht vergessen.', status:'published',
+      items:[{post_id:'p3', minutes:20, note:null}], ratings:{a:[4,'Block-Übung war super'], b:[5,null], d:[4,'Etwas zu lang']}},
+    {id:'s2', title:'Training Dienstag', t:now + 2*d, duration_min:90, place:'Halle 2', note:null, status:'published',
+      items:[{post_id:'p3', minutes:15, note:'Zweiergruppen'}, {post_id:'p1', minutes:20, note:null}], ratings:{}},
+    {id:'s3', title:'Vorbereitung Spieltag', t:now + 5*d, duration_min:75, place:null, note:null, status:'draft', items:[], ratings:{}}];
   if (fresh) {} else if (solo) {
     const plan = [['g1',3],['g2',3],['g3',4],['g4',6]];
     for (let day = 68; day >= 1; day--) for (const [id, every] of plan)
@@ -225,7 +240,7 @@ function makeDemo(kind){
           categories: sm ? ['Aufwärmen','Brust','Rücken','Schultern','Arme','Beine','Core','Cardio','Dehnen'] : ['Aufwärmen','Technik','Spielform','Taktik','Abschluss','Kondition','Ausklang']};
         members = [{id:'c', name:a.p_coach_name.trim() || 'Ich', role:'coach'}];
         if (!sm) members.push({id:'x1', name:'Mitspieler Alex', role:'player'}, {id:'x2', name:'Mitspielerin Bo', role:'player'}, {id:'x3', name:'Mitspieler Chris', role:'player'});
-        posts = []; logs = []; me = 'c';
+        posts = []; logs = []; sessions = []; me = 'c';
         return {...(await api.call('whoami', {})), token:'demo', login_code:'DEMO-' + code().slice(0, 4) + '-' + code().slice(0, 4)};
       }
       if (fn === 'login_with_code') throw new Error('In der Demo gibt es keine Anmeldung. Nutze die echte App.');
@@ -269,7 +284,8 @@ function makeDemo(kind){
           if (p.status === 'new' && p.votes.length >= team.threshold) p.status = 'relevant';
           return {upvotes:p.votes.length};
         }
-        case 'delete_post': { const p = find(a.p_post_id); if (p.by !== me && !coach) throw new Error(ERR.not_allowed); posts = posts.filter(x => x !== p); logs = logs.filter(l => l.post_id !== p.id); return null; }
+        case 'delete_post': { const p = find(a.p_post_id); if (p.by !== me && !coach) throw new Error(ERR.not_allowed); posts = posts.filter(x => x !== p); logs = logs.filter(l => l.post_id !== p.id);
+          sessions.forEach(x => x.items = x.items.filter(i => i.post_id !== p.id)); return null; }
         case 'review_post': { if (!coach) throw new Error(ERR.coach_only); const p = find(a.p_post_id); p.status = a.p_status;
           p.review = {stars:a.p_stars, note:a.p_note, note_public:a.p_note_public, reason:a.p_reason}; return null; }
         case 'rate_post': { if (!coach) throw new Error(ERR.coach_only); const p = find(a.p_post_id); p.review = {...(p.review || {}), stars:a.p_stars}; return null; }
@@ -279,6 +295,24 @@ function makeDemo(kind){
           return {post_id:l.post_id, done_at:new Date(l.t).toISOString(), title:p.title, category:p.category, platform:p.platform}; });
         case 'set_threshold': { if (!coach) throw new Error(ERR.coach_only); team.threshold = a.p_threshold;
           posts.forEach(p => { if (p.status === 'new' && p.votes.length >= team.threshold) p.status = 'relevant'; }); return null; }
+        case 'list_sessions': return sessions.filter(x => x.status === 'published' || coach).map(x => { const rs = Object.values(x.ratings);
+          return {id:x.id, title:x.title, starts_at:new Date(x.t).toISOString(), duration_min:x.duration_min, place:x.place, note:x.note, status:x.status,
+            ratable:x.status === 'published' && x.t <= Date.now(),
+            items:x.items.map(i => { const p = posts.find(q => q.id === i.post_id) || {}; return {post_id:i.post_id, title:p.title, url:p.url, platform:p.platform, category:p.category, minutes:i.minutes, note:i.note}; }),
+            my_rating: x.ratings[me] ? {stars:x.ratings[me][0], comment:x.ratings[me][1]} : null,
+            rating_avg: rs.length ? Math.round(rs.reduce((a, r) => a + r[0], 0) / rs.length * 10) / 10 : null, rating_count:rs.length,
+            comments: coach ? rs.filter(r => r[1]).map(r => ({stars:r[0], comment:r[1]})) : null}; });
+        case 'save_session': { if (!coach) throw new Error(ERR.coach_only);
+          const items = (a.p_items || []).filter(i => posts.some(p => p.id === i.post_id)).map(i => ({post_id:i.post_id, minutes:i.minutes ? +i.minutes : null, note:i.note || null}));
+          let x = a.p_id && sessions.find(q => q.id === a.p_id);
+          if (!x) { x = {id:'s' + Math.random().toString(36).slice(2), status:'draft', ratings:{}}; sessions.push(x); }
+          Object.assign(x, {title:a.p_title, t:Date.parse(a.p_starts_at), duration_min:a.p_duration, place:a.p_place || null, note:a.p_note || null, items}); return x.id; }
+        case 'publish_session': { if (!coach) throw new Error(ERR.coach_only); const x = sessions.find(q => q.id === a.p_id); x.status = 'published'; return null; }
+        case 'delete_session': { if (!coach) throw new Error(ERR.coach_only); sessions = sessions.filter(q => q.id !== a.p_id); return null; }
+        case 'rate_session': { const x = sessions.find(q => q.id === a.p_id); if (!x || x.t > Date.now()) throw new Error('Bewerten geht erst ab Trainingsbeginn.');
+          x.ratings[me] = [a.p_stars, a.p_comment || null]; return null; }
+        case 'get_notify_prefs': return {new_post:true, upvotes:true, coach_queue:true, adopted:true, new_session:true, rate_reminder:true, results:true, quiet_hours:true, devices:0};
+        case 'set_notify_prefs': case 'register_push': case 'unregister_push': return null;
         case 'new_login_code': return 'DEMO-' + code().slice(0, 4) + '-' + code().slice(0, 4);
         case 'new_share_key': return 'hmc_demo_' + code().toLowerCase();
         case 'leave_team': if (fresh) { team = null; members = []; posts = []; logs = []; me = null; } return null;
@@ -411,6 +445,9 @@ async function load(){
     S.me = await api.call('whoami', {p_token:token()});
     S.posts = await api.call('list_posts', {p_token:token()});
     if (S.tab === 'stats') S.log = await api.call('list_my_log', {p_token:token()});
+    if (S.tab === 'training' && S.me.team.mode === 'team') S.sessions = await api.call('list_sessions', {p_token:token()});
+    if (S.tab === 'team' && S.me.team.mode === 'team' && !demo) S.prefs = await api.call('get_notify_prefs', {p_token:token()}).catch(() => null);
+    if (!load.told) { load.told = true; nativeLoggedIn(); }
     render();
   } catch (e) {
     if (/neu anmelden/.test(e.message)) { if (!demo) store.del('token'); S.me = null; render(); }
@@ -448,7 +485,7 @@ function render(){
     hint = `Upvote, was ihr trainieren wollt. Ab ${S.me.team.threshold} Upvotes landet es beim Coach.`; }
   if (S.tab === 'coach') { list = ['relevant','new','seen','rejected'].flatMap(s => S.posts.filter(p => p.status === s));
     hint = 'Oben: hat die Schwelle erreicht. Darunter: neu, angeschaut, abgelehnt.'; }
-  if (S.tab === 'training') { list = S.posts.filter(p => p.status === 'adopted'); hint = 'Vom Coach ins Training aufgenommen. Tippe auf „Gemacht“, wenn du es trainiert hast.'; }
+  if (S.tab === 'training') { list = S.posts.filter(p => p.status === 'adopted'); hint = 'Übungs-Sammlung: vom Coach ins Training aufgenommen. Tippe auf „Gemacht“, wenn du sie trainiert hast.'; }
   if (S.tab === 'mine') { list = S.posts.filter(p => p.mine); hint = 'Deine geteilten Links und was der Coach dazu sagt.'; }
   if (solo && S.tab !== 'stats' && S.tab !== 'team') list = sortList(list);
   const usedCats = [...new Set(list.map(p => p.category).filter(Boolean))];
@@ -460,7 +497,7 @@ function render(){
   const sorter = solo ? `<div class="row" style="margin:0 0 12px"><label for="sort" class="small" style="margin:0">Sortieren</label>
       <select id="sort" style="width:auto;flex:1">${Object.entries(SORTS).map(([k,l]) => `<option value="${k}" ${k === (S.sort || 'new') ? 'selected' : ''}>${l}</option>`).join('')}</select></div>` : '';
   const body = S.tab === 'team' ? teamView(coach) : S.tab === 'stats' ? statsView()
-    : `<p class="hint">${esc(hint)}</p>${filters}${sorter}${list.length ? list.map(postCard).join('') : emptyView()}`;
+    : `${S.tab === 'training' && !solo ? sessionsBlock(coach) + '<h2 style="font-size:24px;margin:22px 2px 0">Übungen</h2>' : ''}<p class="hint">${esc(hint)}</p>${filters}${sorter}${list.length ? list.map(postCard).join('') : emptyView()}`;
   app.innerHTML = `
     <header class="top">${motifSvg(theme.motif)}
       ${S.me.team.logo ? `<img class="logo" src="${esc(S.me.team.logo)}" alt="">` : LOGO}
@@ -470,12 +507,12 @@ function render(){
     <main>${S.tab === 'team' || S.tab === 'stats' ? '' : installBanner()}${body}</main>
     <button class="fab" id="fab">${solo ? '+ Video speichern' : '+ Link teilen'}</button>`;
   app.querySelectorAll('[data-tab]').forEach(b => b.onclick = async () => { S.tab = b.dataset.tab; S.cat = '';
-    if (S.tab === 'stats') { try { S.log = await api.call('list_my_log', {p_token:token()}); } catch (e) { toast(e.message); } }
+    if (S.tab === 'stats' || S.tab === 'training' || S.tab === 'team') return load().then(() => scrollTo(0, 0));
     render(); scrollTo(0,0); });
   app.querySelectorAll('[data-f]').forEach(b => b.onclick = () => { S.cat = b.dataset.f; render(); });
   const so = $('#sort'); if (so) so.onchange = () => { S.sort = so.value; render(); };
   $('#fab').onclick = () => openShare('');
-  bindPosts(); bindMode(); bindInstall(); if (S.tab === 'team') bindTeam();
+  bindPosts(); bindMode(); bindInstall(); if (S.tab === 'training') bindSessions(); if (S.tab === 'team') bindTeam();
 }
 
 function emptyView(){
@@ -533,6 +570,99 @@ function bindPosts(){
     isSolo() ? 'Das Video und deine Einträge dazu werden gelöscht.' : 'Er verschwindet für alle. Das lässt sich nicht rückgängig machen.', 'Löschen', async () => {
     await api.call('delete_post', {p_token:token(), p_post_id:b.dataset.del}); toast('Gelöscht'); await load(); }));
   document.querySelectorAll('[data-rev]').forEach(b => b.onclick = () => openReview(S.posts.find(p => p.id === b.dataset.rev)));
+}
+
+// ---------- training sessions (team mode) ----------
+const fmtWhen = (iso, min) => { const d = new Date(iso), e = new Date(d.getTime() + (min || 90) * 6e4);
+  const day = d.toLocaleDateString('de-DE', {weekday:'short', day:'2-digit', month:'2-digit'});
+  const hm = x => x.toLocaleTimeString('de-DE', {hour:'2-digit', minute:'2-digit'});
+  return `${day} · ${hm(d)}–${hm(e)}`; };
+const starRow = n => `<span class="srow" aria-label="${n} von 5 Sternen">${'★'.repeat(Math.round(n))}<span>${'★'.repeat(5 - Math.round(n))}</span></span>`;
+function sessionsBlock(coach){
+  const ss = S.sessions || [], now = Date.now();
+  const end = s => Date.parse(s.starts_at) + s.duration_min * 6e4;
+  const upcoming = ss.filter(s => end(s) >= now).sort((a, b) => Date.parse(a.starts_at) - Date.parse(b.starts_at));
+  const past = ss.filter(s => end(s) < now);
+  const head = `<div class="row" style="justify-content:space-between;margin:14px 2px 10px"><h2 style="font-size:26px">Trainingsplan</h2>
+    ${coach ? '<button class="btn" id="newSess">+ Neue Einheit</button>' : ''}</div>`;
+  if (!ss.length) return head + `<p class="hint" style="margin-top:0">${coach ? 'Stell aus den aufgenommenen Videos eine Einheit zusammen und veröffentliche sie. Die Mannschaft sieht dann, was als Nächstes kommt.' : 'Noch kein Training geplant. Sobald der Coach eine Einheit veröffentlicht, steht sie hier.'}</p>`;
+  return head + upcoming.map((s, i) => sessCard(s, coach, i === 0 ? 'Nächstes Training' : '')).join('')
+    + (past.length ? `<h3 style="font-size:20px;margin:18px 2px 10px">Vergangene Einheiten</h3>` + past.map(s => sessCard(s, coach, '')).join('') : '');
+}
+function sessCard(s, coach, label){
+  const draft = s.status === 'draft';
+  const rate = s.ratable ? `<div class="rate">
+      ${s.rating_count ? `<b>${String(s.rating_avg).replace('.', ',')}</b> ${starRow(s.rating_avg)} <span class="small">${s.rating_count} ${s.rating_count === 1 ? 'Bewertung' : 'Bewertungen'}</span>` : '<span class="small">Noch keine Bewertung</span>'}
+      <button class="btn ${s.my_rating ? 'alt' : 'acc'}" data-rates="${esc(s.id)}">${s.my_rating ? 'Deine: ' + '★'.repeat(s.my_rating.stars) : 'Training bewerten'}</button></div>
+      ${coach && s.comments && s.comments.length ? `<details class="small"><summary class="link">${s.comments.length} Kommentar${s.comments.length > 1 ? 'e' : ''} (anonym)</summary>
+        <ul class="cmts">${s.comments.map(c => `<li>${'★'.repeat(c.stars)} ${esc(c.comment)}</li>`).join('')}</ul></details>` : ''}` : '';
+  return `<article class="card sess ${draft ? 'draft' : ''}">
+    <div class="meta">${label ? `<span class="chip s-relevant">${label}</span>` : ''}${draft ? '<span class="chip">Entwurf, nur für dich sichtbar</span>' : ''}</div>
+    <h3>${esc(s.title)}</h3>
+    <div class="when">${fmtWhen(s.starts_at, s.duration_min)}${s.place ? ' · ' + esc(s.place) : ''}</div>
+    ${s.items.length ? `<ol class="items">${s.items.map(it => `<li><a class="link" href="${esc(it.url)}" target="_blank" rel="noopener">${esc(it.title || (PL[it.platform] || 'Video'))}</a>
+      ${it.minutes ? `<span class="small nowrap">${it.minutes} Min.</span>` : ''}${it.category ? ` <span class="cat">${esc(it.category)}</span>` : ''}${it.note ? `<div class="small">${esc(it.note)}</div>` : ''}</li>`).join('')}</ol>` : ''}
+    ${s.note ? `<p class="small">${esc(s.note)}</p>` : ''}
+    ${rate}
+    ${coach ? `<div class="row" style="margin-top:10px">${draft ? `<button class="btn acc" data-pub="${esc(s.id)}">Veröffentlichen</button>` : ''}
+      <button class="btn alt" data-edsess="${esc(s.id)}">Bearbeiten</button><button class="btn alt" data-delsess="${esc(s.id)}">Löschen</button></div>` : ''}
+  </article>`;
+}
+function bindSessions(){
+  const run = async (fn, args, msg) => { try { await api.call(fn, {p_token:token(), ...args}); if (msg) toast(msg); await load(); } catch (e) { toast(e.message); } };
+  const n = $('#newSess'); if (n) n.onclick = () => openSessionEditor(null);
+  document.querySelectorAll('[data-edsess]').forEach(b => b.onclick = () => openSessionEditor(S.sessions.find(s => s.id === b.dataset.edsess)));
+  document.querySelectorAll('[data-pub]').forEach(b => b.onclick = () => confirmSheet('Einheit veröffentlichen?', 'Die ganze Mannschaft sieht sie dann im Trainingsplan.', 'Veröffentlichen',
+    () => run('publish_session', {p_id:b.dataset.pub}, 'Veröffentlicht')));
+  document.querySelectorAll('[data-delsess]').forEach(b => b.onclick = () => confirmSheet('Einheit löschen?', 'Die Einheit und ihre Bewertungen werden gelöscht. Die Videos bleiben erhalten.', 'Löschen',
+    () => run('delete_session', {p_id:b.dataset.delsess}, 'Gelöscht')));
+  document.querySelectorAll('[data-rates]').forEach(b => b.onclick = () => openRateSession(S.sessions.find(s => s.id === b.dataset.rates)));
+}
+const toLocalInput = d => new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
+function openSessionEditor(s){
+  const pool = S.posts.filter(p => p.status === 'adopted' || (s && s.items.some(i => i.post_id === p.id)));
+  const chosen = new Map((s ? s.items : []).map(i => [i.post_id, i]));
+  const def = new Date(); def.setDate(def.getDate() + 1); def.setHours(18, 0, 0, 0);
+  sheet(`<h2>${s ? 'Einheit bearbeiten' : 'Neue Einheit'}</h2>
+    <form id="sessForm">
+      <label for="se_t">Titel</label><input id="se_t" type="text" maxlength="80" required value="${esc(s ? s.title : 'Training')}">
+      <div class="row" style="align-items:flex-end">
+        <div style="flex:2;min-width:180px"><label for="se_d">Beginn</label><input id="se_d" type="datetime-local" required value="${toLocalInput(s ? new Date(s.starts_at) : def)}"></div>
+        <div style="flex:1;min-width:110px"><label for="se_m">Dauer (Min.)</label><input id="se_m" type="number" min="10" max="600" value="${s ? s.duration_min : 90}"></div></div>
+      <label for="se_p">Ort <span class="small">(optional)</span></label><input id="se_p" type="text" maxlength="80" value="${esc(s && s.place || '')}" placeholder="z. B. Platz 2">
+      <label>Übungen</label>
+      ${pool.length ? `<div class="pickl">${pool.map(p => { const c = chosen.get(p.id);
+        return `<label class="pickrow"><input type="checkbox" data-sp="${esc(p.id)}" ${c ? 'checked' : ''}><span>${esc(p.title || PL[p.platform] + '-Video')}${p.category ? ` <span class="cat">${esc(p.category)}</span>` : ''}</span>
+          <input type="number" min="1" max="240" placeholder="Min." data-spm="${esc(p.id)}" value="${c && c.minutes ? c.minutes : ''}" aria-label="Minuten"></label>`; }).join('')}</div>`
+        : '<p class="small">Noch keine Videos aufgenommen. Nimm im Coach-Tab Videos „Ins Training“, dann kannst du sie hier einplanen.</p>'}
+      <label for="se_n">Notiz für die Mannschaft <span class="small">(optional)</span></label><textarea id="se_n" maxlength="2000" placeholder="z. B. Hütchen und Leibchen mitbringen">${esc(s && s.note || '')}</textarea>
+      <div class="row" style="margin-top:14px">${s && s.status === 'published' ? '<button class="btn acc" type="submit">Speichern</button>'
+        : '<button class="btn acc" type="submit" data-andpub="1">Speichern und veröffentlichen</button><button class="btn" type="submit">Als Entwurf</button>'}
+        <button class="btn alt" type="button" data-close>Abbrechen</button></div>
+    </form>`);
+  let pub = false;
+  document.querySelectorAll('#sessForm [type=submit]').forEach(b => b.onclick = () => { pub = !!b.dataset.andpub; });
+  $('#sessForm').onsubmit = async e => { e.preventDefault();
+    const items = [...document.querySelectorAll('[data-sp]')].filter(c => c.checked).map(c => ({post_id:c.dataset.sp, minutes:(document.querySelector(`[data-spm="${c.dataset.sp}"]`) || {}).value || null}));
+    const d = new Date($('#se_d').value); if (isNaN(d)) return toast('Bitte Datum und Uhrzeit angeben.');
+    try {
+      const id = await api.call('save_session', {p_token:token(), p_id:s ? s.id : null, p_title:$('#se_t').value, p_starts_at:d.toISOString(),
+        p_duration:parseInt($('#se_m').value, 10) || 90, p_place:$('#se_p').value, p_note:$('#se_n').value, p_items:items});
+      if (pub) await api.call('publish_session', {p_token:token(), p_id:id});
+      closeSheet(); toast(pub ? 'Veröffentlicht, die Mannschaft sieht es jetzt.' : 'Gespeichert'); await load();
+    } catch (err) { toast(err.message); } };
+}
+function openRateSession(s){
+  let stars = s.my_rating ? s.my_rating.stars : 0;
+  sheet(`<h2>Wie war das Training?</h2><p class="small">${esc(s.title)} · ${fmtWhen(s.starts_at, s.duration_min)}</p>
+    <div class="stars" id="rs_st" style="margin:8px 0">${[1,2,3,4,5].map(i => `<button type="button" data-s="${i}" aria-label="${i} Sterne">★</button>`).join('')}</div>
+    <label for="rs_c">Kommentar <span class="small">(optional, der Coach sieht ihn ohne Namen)</span></label>
+    <textarea id="rs_c" maxlength="500" placeholder="Was war gut, was weniger?">${esc(s.my_rating && s.my_rating.comment || '')}</textarea>
+    <div class="row" style="margin-top:14px"><button class="btn acc" id="rs_ok">Bewertung senden</button><button class="btn alt" data-close>Abbrechen</button></div>`);
+  const paint = () => document.querySelectorAll('#rs_st [data-s]').forEach(b => b.classList.toggle('on', +b.dataset.s <= stars));
+  document.querySelectorAll('#rs_st [data-s]').forEach(b => b.onclick = () => { stars = +b.dataset.s; paint(); }); paint();
+  $('#rs_ok').onclick = async () => { if (!stars) return toast('Bitte Sterne vergeben.');
+    try { await api.call('rate_session', {p_token:token(), p_id:s.id, p_stars:stars, p_comment:$('#rs_c').value}); closeSheet(); toast('Danke für dein Feedback!'); await load(); } catch (e) { toast(e.message); } };
 }
 
 // ---------- statistics (computed from my own log) ----------
@@ -621,7 +751,7 @@ function teamView(coach){
             Anfragetext <b>JSON</b>: Feld <b>p_key</b> = dein Teilen-Schlüssel, Feld <b>p_text</b> = <b>Kurzbefehleingabe</b>.</li>
           <li>Aktion <b>Wörterbuchwert abrufen</b>: Schlüssel <b>message</b>. Danach <b>Mitteilung anzeigen</b> mit dem Wörterbuchwert.</li>
           <li>Fertig. Zum Weitergeben: Kurzbefehl teilen → <b>iCloud-Link kopieren</b>. Vorher beim Feld p_key „Beim Import fragen“ einstellen, dann fragt der Kurzbefehl jeden nach seinem eigenen Schlüssel.</li></ol></details></section>`;
-  return `${invite}${access}${coachBox}${IS_ANDROID ? '' : shortcut}
+  return `${invite}${access}${notifyBox()}${coachBox}${IS_ANDROID || IN_APP ? '' : shortcut}
     <section class="card"><h2 style="font-size:26px">So speicherst du ein Video</h2>
       <p><b>Android:</b> App installieren (Chrome-Menü ⋮ → „App installieren“). Danach in TikTok oder Instagram auf <i>Teilen</i> tippen und <b>Hear Me Coach</b> wählen.</p>
       <p><b>iPhone:</b> Kurzbefehl „Hear Me Coach“ nutzen (siehe oben) oder im Video <i>Teilen → Link kopieren</i> und hier „${solo ? '+ Video speichern' : '+ Link teilen'}“ antippen. Dort auf „Einfügen“ tippen.</p>
@@ -629,7 +759,25 @@ function teamView(coach){
     <section class="card"><button class="btn alt" id="leave">${solo ? 'Sammlung löschen' : 'Mannschaft verlassen'}</button>
       <p class="small">${solo ? 'Löscht dein Profil, deine Videos und deine Statistik.' : 'Löscht dein Profil und deine geteilten Links.'}</p></section>`;
 }
+const NOTIFY = [['new_post','Neues Video im Pool'], ['upvotes','Upvotes für meine Videos (gebündelt)'], ['coach_queue','Videos mit genug Upvotes (für Coaches)'],
+  ['adopted','Mein Video kommt ins Training'], ['new_session','Neuer Trainingsplan'], ['rate_reminder','Nach dem Training: zur Bewertung erinnern'],
+  ['results','Ergebnis der Trainingsbewertung'], ['quiet_hours','Nachtruhe 22–7 Uhr (dann nichts senden)']];
+function notifyBox(){
+  if (!S.me || S.me.team.mode !== 'team') return '';
+  const p = S.prefs || {}, coach = S.me.role === 'coach';
+  return `<section class="card"><h2 style="font-size:26px">Benachrichtigungen</h2>
+    ${IN_APP ? `<div class="row" style="margin-bottom:8px"><button class="btn acc" id="pushOn">${p.devices ? 'Auf diesem Handy aktiv · erneut verbinden' : 'Auf diesem Handy einschalten'}</button></div>`
+      : `<p class="small">Benachrichtigungen kommen über die Hear-Me-Coach-App aufs Handy${p.devices ? ` (${p.devices} ${p.devices === 1 ? 'Gerät' : 'Geräte'} verbunden)` : ''}. Hier stellst du ein, welche du bekommst.</p>`}
+    <div class="toggles">${NOTIFY.filter(([k]) => k !== 'coach_queue' || coach).map(([k, l]) => `<label class="switch"><input type="checkbox" data-np="${k}" ${p[k] !== false ? 'checked' : ''}> ${esc(l)}</label>`).join('')}</div></section>`;
+}
+function bindNotify(){
+  document.querySelectorAll('[data-np]').forEach(c => c.onchange = async () => {
+    try { await api.call('set_notify_prefs', {p_token:token(), p_prefs:{[c.dataset.np]:c.checked}}); if (S.prefs) S.prefs[c.dataset.np] = c.checked; toast('Gespeichert'); }
+    catch (e) { c.checked = !c.checked; toast(e.message); } });
+  const po = $('#pushOn'); if (po) po.onclick = () => toNative({type:'enablePush'});
+}
 function bindTeam(){
+  bindNotify();
   const ci = $('#copyInvite'); if (ci) ci.onclick = async () => {
     const txt = `Komm in unseren Trainings-Pool bei Hear Me Coach: ${location.href.split('?')[0].split('#')[0]} – Code: ${S.me.team.player_code}`;
     try { await navigator.clipboard.writeText(txt); toast('Einladung kopiert'); } catch { toast('Kopieren nicht möglich: ' + txt); } };
@@ -656,7 +804,8 @@ function bindTeam(){
     const c = await api.call('new_login_code', {p_token:token()}); showCodeSheet(c, false); return 'keep'; });
   $('#logoutBtn').onclick = () => confirmSheet('Auf diesem Gerät abmelden?', store.get('login_code') ? `Zum Wiederanmelden brauchst du deinen Zugangscode: ${store.get('login_code')}` : 'Zum Wiederanmelden brauchst du deinen Zugangscode. Erzeuge vorher einen, falls du ihn nicht hast.', 'Abmelden', async () => {
     if (demo) { demoHooks.fresh(); return; }
-    await api.call('logout', {p_token:token()}).catch(() => {}); store.del('token'); S.me = null; render(); });
+    if (store.get('push_token')) await api.call('unregister_push', {p_push_token:store.get('push_token')}).catch(() => {});
+    await api.call('logout', {p_token:token()}).catch(() => {}); store.del('token'); S.me = null; load.told = false; toNative({type:'loggedOut'}); render(); });
   const mk = $('#mkKey'); if (mk) mk.onclick = async () => {
     try { const k = await api.call('new_share_key', {p_token:token()});
       $('#keyOut').innerHTML = `<div class="keybox">${esc(k)}</div><div class="row"><button class="btn acc" id="cpKey">Schlüssel kopieren</button></div>
@@ -819,7 +968,7 @@ addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = 
 const SHORTCUT_URL = ''; // iCloud link of the shared iPhone shortcut, once created
 const fmtCode = c => (c || '').toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/(.{4})(?=.)/g, '$1-');
 function installBanner(){
-  if (STANDALONE || demo || store.get('hideInstall') || !(IS_IOS || IS_ANDROID)) return '';
+  if (IN_APP || STANDALONE || demo || store.get('hideInstall') || !(IS_IOS || IS_ANDROID)) return '';
   return `<section class="card install"><h3>Als App installieren</h3>
     ${IS_IOS ? `<ol><li>Unten in Safari auf <b>Teilen</b> <svg viewBox="0 0 24 24" class="ico"><path d="M12 3v12M7 8l5-5 5 5M5 12v8h14v-8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg> tippen.</li>
         <li>Nach unten scrollen: <b>Zum Home-Bildschirm</b>.</li>
@@ -843,6 +992,21 @@ function showCodeSheet(code, first){
     <p class="small" style="margin-top:12px">Tipp: Mach ein Bildschirmfoto oder speichere den Code in deinen Notizen. Gib ihn nicht weiter, er ist wie ein Passwort.</p>`);
   $('#cpCode').onclick = async () => { try { await navigator.clipboard.writeText(code); toast('Code kopiert'); } catch { toast('Bitte abschreiben: ' + code); } };
 }
+
+// ---------- native app bridge (Hear Me Coach app wraps this page in a WebView) ----------
+const IN_APP = !!window.ReactNativeWebView;
+const toNative = msg => { try { window.ReactNativeWebView.postMessage(JSON.stringify(msg)); } catch {} };
+window.hmcNative = {
+  // native -> web: a link was shared into the app from TikTok, Instagram, YouTube …
+  share(text){ const u = firstUrl(text); if (!u) return; if (S.me) { closeSheet(); openShare(u); } else pendingShare = u; },
+  // native -> web: Expo push token after permission was granted
+  async pushToken(pt, platform){ store.set('push_token', pt);
+    if (S.me && !demo) { try { await api.call('register_push', {p_token:token(), p_push_token:pt, p_platform:platform}); } catch (e) { toast(e.message); } } },
+  // native -> web: notification tapped
+  open(tab){ if (!S.me) return; if (tab) S.tab = tab; closeSheet(); load(); },
+  pushDenied(){ toast('Benachrichtigungen sind in den Handy-Einstellungen ausgeschaltet.'); },
+};
+function nativeLoggedIn(){ if (IN_APP && S.me && !demo) toNative({type:'loggedIn', team:S.me.team.name}); }
 
 // ---------- share target ----------
 let pendingShare = '';
